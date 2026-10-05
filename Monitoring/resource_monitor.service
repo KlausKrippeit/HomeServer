@@ -1,0 +1,12 @@
+[Unit]
+Description=Raspberry Pi Resource Monitor Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/scripts/raspi_monitor_service.py
+WorkingDirectory=/home/pi/scripts
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
