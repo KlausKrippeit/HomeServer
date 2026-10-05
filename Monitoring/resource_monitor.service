@@ -3,6 +3,7 @@ Description=Raspberry Pi Resource Monitor Service
 After=network.target
 
 [Service]
+EnvironmentFile=/home/pi/scripts/.env
 ExecStart=/usr/bin/python3 /home/pi/scripts/raspi_monitor_service.py
 WorkingDirectory=/home/pi/scripts
 Restart=always
