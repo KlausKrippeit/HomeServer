@@ -1,66 +1,14 @@
 #!/usr/bin/env python3
-"""
-Erstellt Monitor Daten eines Raspberry Pi.
-Sendet einen Messwert an einen FHEM-Server.
-"""
-import re
-import sys
-import requests
-import os
 import psutil
 import subprocess
 import time
+import socket
+import os
+import sys
 
-FHEM_URL      = os.getenv("FHEM_URL", "http://localhost:8083/fhem")
-FHEM_USER     = os.getenv("FHEM_USER", "")
-FHEM_PASS     = os.getenv("FHEM_PASS", "")
-DEVICE_NAME   = os.getenv("FHEM_DEVICE_NAME", "HostDevice")
-_csrf_token: str | None = None
+# Pfad zum Shell-Skript
+SENDING_SCRIPT = "/home/pi/scripts/raspi_monitor.py"
 
-# Session wiederverwenden (Cookies wie beim curl cookie-jar)
-session = requests.Session()
-session.headers.update({"User-Agent": "Mozilla/5.0"})
-
-# HTTP-Auth, falls konfiguriert
-if FHEM_USER and FHEM_PASS:
-    session.auth = (FHEM_USER, FHEM_PASS)
-
-def get_csrf_token() -> str:
-    global _csrf_token
-    if _csrf_token is not None:
-        return _csrf_token
-
-    """Ruft die FHEM-Seite ab und extrahiert das CSRF-Token."""
-    response = session.get(FHEM_URL, timeout=10)
-    response.raise_for_status()
-
-    match = re.search(r'name="fwcsrf" value="([^"]+)"', response.text)
-    if not match:
-        print("Fehler: Kein CSRF-Token gefunden.")
-        sys.exit(1)
-
-    _csrf_token = match.group(1)
-
-    return match.group(1)
-
-def send_value(reading: str, value: str) -> None:
-    """Sendet den Wert an die FHEM-API."""
-
-    if value is None:
-        print(f"Reading {reading} übersprungen (Wert ist None).")
-        return
-
-    csrf_token = get_csrf_token()
-
-    payload = {
-        "fwcsrf": csrf_token,
-        "cmd": f"set {DEVICE_NAME} {reading} {value}",
-    }
-
-    api_response = session.post(FHEM_URL, data=payload, timeout=10)
-    api_response.raise_for_status()
-
-# Monitor Daten
 def get_cpu_temperature():
     """Gibt die CPU-Temperatur des Raspberry Pi 5 zurück (in °C, aber ohne Einheit)."""
     try:
@@ -121,6 +69,18 @@ def get_cpu_usage_percent(interval=1):
         print(f"Fehler beim Lesen der CPU-Auslastung: {e}")
         return None
 
+def send_to_script(resource, value):
+    """Sendet den Wert an das Shell-Skript `sendingFurther.sh`."""
+    try:
+        if value is not None:
+            subprocess.run([sys.executable, SENDING_SCRIPT, resource, str(value)], check=True)
+        else:
+            print(f"Kein gültiger Wert für {resource} erhalten.")
+    except subprocess.CalledProcessError as e:
+        print(f"Fehler beim Ausführen von {SENDING_SCRIPT}: {e}")
+    except Exception as e:
+        print(f"Allgemeiner Fehler beim Senden von {resource}: {e}")
+
 def main():
     """Hauptschleife: Abfragen der Ressourcen und Senden an das Shell-Skript."""
     INTERVAL = 10  # Sekunden
@@ -136,11 +96,11 @@ def main():
         cpu_usage = get_cpu_usage_percent()
 
         # Werte an das Shell-Skript senden
-        send_value("cpu_temperature", cpu_temp)
-        send_value("cpu_speed", cpu_speed)
-        send_value("db_reachability", db_reachable)
-        send_value("ping_status", ping_status)
-        send_value("cpu_usage", cpu_usage)
+        send_to_script("cpu_temperature", cpu_temp)
+        send_to_script("cpu_speed", cpu_speed)
+        send_to_script("db_reachability", db_reachable)
+        send_to_script("ping_status", ping_status)
+        send_to_script("cpu_usage", cpu_usage)
 
         elapsed = time.monotonic() - cycle_start
         sleep_time = INTERVAL - elapsed
