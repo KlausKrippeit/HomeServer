@@ -121,6 +121,14 @@ def get_cpu_usage_percent(interval=1):
         print(f"Fehler beim Lesen der CPU-Auslastung: {e}")
         return None
 
+def get_ram_available():
+    """Tatsächlich verfügbarer RAM in MB (oder None)."""
+    try:
+        return round(psutil.virtual_memory().available / 1024**2, 0)
+    except Exception as e:
+        log.warning("Fehler beim Lesen des RAM: %s", e)
+        return None
+
 def main():
     """Hauptschleife: Abfragen der Ressourcen und Senden an das Shell-Skript."""
     INTERVAL = 10  # Sekunden
@@ -134,6 +142,7 @@ def main():
         db_reachable = check_db_reachability()
         ping_status = check_ping_status()
         cpu_usage = get_cpu_usage_percent()
+        ram_available = get_ram_available()
 
         # Werte an das Shell-Skript senden
         send_value("cpu_temperature", cpu_temp)
@@ -141,6 +150,7 @@ def main():
         send_value("db_reachability", db_reachable)
         send_value("ping_status", ping_status)
         send_value("cpu_usage", cpu_usage)
+        send_value("ram_available", ram_available)
 
         elapsed = time.monotonic() - cycle_start
         sleep_time = INTERVAL - elapsed
