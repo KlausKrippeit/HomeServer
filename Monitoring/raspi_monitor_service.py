@@ -10,6 +10,7 @@ import os
 import psutil
 import subprocess
 import time
+import logging
 
 FHEM_URL      = os.getenv("FHEM_URL", "http://localhost:8083/fhem")
 FHEM_USER     = os.getenv("FHEM_USER", "")
@@ -25,14 +26,23 @@ session.headers.update({"User-Agent": "Mozilla/5.0"})
 if FHEM_USER and FHEM_PASS:
     session.auth = (FHEM_USER, FHEM_PASS)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
+
 def get_csrf_token() -> str:
     global _csrf_token
     if _csrf_token is not None:
         return _csrf_token
 
     """Ruft die FHEM-Seite ab und extrahiert das CSRF-Token."""
-    response = session.get(FHEM_URL, timeout=10)
-    response.raise_for_status()
+    try:
+        response = session.get(FHEM_URL, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        logging.warning("FHEM nicht erreichbar, kein token! %s", e)
+        return None
 
     match = re.search(r'name="fwcsrf" value="([^"]+)"', response.text)
     if not match:
@@ -51,14 +61,22 @@ def send_value(reading: str, value: str) -> None:
         return
 
     csrf_token = get_csrf_token()
+    if _csrf_token is None:
+        return False
 
     payload = {
         "fwcsrf": csrf_token,
         "cmd": f"set {DEVICE_NAME} {reading} {value}",
     }
 
-    api_response = session.post(FHEM_URL, data=payload, timeout=10)
-    api_response.raise_for_status()
+    try:
+        api_response = session.post(FHEM_URL, data=payload, timeout=10)
+        api_response.raise_for_status()
+        #logging.info("FHEM Wert %s=%s gesendet!", reading, value)
+        return True
+    except Exception as e:
+        logging.warning("FHEM nicht erreichbar, Wert %s=%s nicht gesendet: %s", reading, value, e)
+        return False
 
 # Monitor Daten
 def get_cpu_temperature():
@@ -131,9 +149,10 @@ def get_ram_available():
 
 def main():
     """Hauptschleife: Abfragen der Ressourcen und Senden an das Shell-Skript."""
-    INTERVAL = 10  # Sekunden
+    INTERVAL = 30  # Sekunden
 
     while True:
+        #logging.info("Zyklus start")
         # Startzeit des Zyklus merken
         cycle_start = time.monotonic()
         # Ressourcen abfragen
