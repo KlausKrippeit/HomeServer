@@ -13,35 +13,41 @@
 ``nano Monitoring/raspi_monitor_service.py``
 
 ## Ordnergrössen anzeigen
-``du -h --max-depth=1 . | sort -rh``
-``sudo du -h --max-depth=1 . | sort -rh``
-``sudo du -h --max-depth=2 . | sort -rh``
-``sudo du -h --max-depth=2 / | sort -rh``
+ ``du -h --max-depth=1 . | sort -rh``
+ ``sudo du -h --max-depth=1 . | sort -rh``
+ ``sudo du -h --max-depth=2 . | sort -rh``
+ ``sudo du -h --max-depth=2 / | sort -rh``
 
-``docker inspect -f '{{.State.Status}}' homeassistant``
-``docker inspect -f '{{.State.Status}}' fhem``
-``docker inspect -f '{{.State.Status}}' mariadb-fhem``
+## Container Status
+| Befehl |
+|---|
+|``docker inspect -f '{{.State.Status}}' homeassistant``|
+|``docker inspect -f '{{.State.Status}}' fhem``|
+|``docker inspect -f '{{.State.Status}}' mariadb-fhem``|
 
 ## Docker Statistik alle Container
-``docker stats``
-
-``docker stop opencloud-compose-opencloud-1``
-``docker stop opencloud-compose-radicale-1``
+| Befehl|
+|---|
+|``docker stats``|
+|``docker stop opencloud-compose-opencloud-1``|
+|``docker stop opencloud-compose-radicale-1``|
 
 ## Alle container -a auch die gestoppen
 ``docker ps -a``
 
 ## Alle Container anzeigen in formatierter Tabelle
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ContainserId}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.Containser Id}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.Container Id}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ContainerId}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.Container}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ContainerId}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.RunningFor}}"``
-``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ID}}"``
+|Befehl|
+|---|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ContainserId}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.Containser Id}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.Container Id}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ContainerId}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.Container}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ContainerId}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.RunningFor}}"``|
+|``docker  ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}\t{{.ID}}"``|
 
 |Befehl|Komentar|
 |---|---|
