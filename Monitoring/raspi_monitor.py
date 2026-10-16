@@ -11,7 +11,7 @@ import os
 FHEM_URL      = os.getenv("FHEM_URL", "http://localhost:8083/fhem")
 FHEM_USER     = os.getenv("FHEM_USER", "")
 FHEM_PASS     = os.getenv("FHEM_PASS", "")
-DEVICE_NAME   = os.getenv("FHEM_DEVICE_NAME", "HostDevice")
+DEVICE_NAME   = os.getenv("FHEM_DEVICE_NAME", "KlimaSensor203")
 
 # Session wiederverwenden (Cookies wie beim curl cookie-jar)
 session = requests.Session()
@@ -33,25 +33,31 @@ def get_csrf_token() -> str:
 
     return match.group(1)
 
-def send_value(reading: str, value: str) -> None:
+#def send_value(reading: str, value: str) -> None:
+def send_value() -> None:
     """Sendet den Wert an die FHEM-API."""
     csrf_token = get_csrf_token()
 
     payload = {
         "fwcsrf": csrf_token,
-        "cmd": f"set {DEVICE_NAME} {reading} {value}",
+        "cmd": f"jsonlist2 {DEVICE_NAME} temperature battery",
+        "XHR": "1",
     }
-
-    api_response = session.post(FHEM_URL, data=payload, timeout=10)
-    api_response.raise_for_status()
+    try:
+        api_response = session.get(FHEM_URL, data=payload, timeout=10)
+        api_response.raise_for_status()
+        print(api_response.text)
+    except Exception as e:
+        print(f"Error: {e}");
 
 def main():
     # Überprüfe, ob ein Parameter übergeben wurde
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <reading> <value>")
-        sys.exit(1)
+    #if len(sys.argv) < 2:
+        #print(f"Usage: {sys.argv[0]} <reading> <value>")
+        #sys.exit(1)
 
-    send_value(sys.argv[1], sys.argv[2])
+    #send_value(sys.argv[1], sys.argv[2])
+    send_value()
 
 if __name__ == "__main__":
     main()
