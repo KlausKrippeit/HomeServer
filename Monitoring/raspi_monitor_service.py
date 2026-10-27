@@ -163,7 +163,7 @@ def main():
         cpu_usage = get_cpu_usage_percent()
         ram_available = get_ram_available()
 
-        # Werte an das Shell-Skript senden
+        # Werte an das fhem api senden
         send_value("cpu_temperature", cpu_temp)
         send_value("cpu_speed", cpu_speed)
         send_value("db_reachability", db_reachable)
