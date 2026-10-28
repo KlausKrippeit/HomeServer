@@ -34,70 +34,97 @@ def run_sudo(cmd, check=True):
     print(f"$ sudo {' '.join(cmd)}")                        # Befehl zur Info anzeigen
     return subprocess.run(["sudo"] + cmd, check=check)      # sudo davorsetzen und ausführen
 
-
 def install():
-    """Fragt alle Werte ab und installiert den Service."""
+    """Fragt alle Werte ab und installiert den Service (optional mit Timer)."""
     print("\n--- Installation ---")                         # Überschrift
     source_dir = Path(ask("Ordner mit Script und .service-Datei", str(Path.cwd()))).expanduser()  # Quellordner
     service_name = ask("Service-Name (ohne .service)", "myservice")     # Name des Services
     script_name = ask("Name des Python-Scripts", f"{service_name}.py")  # Python-Datei
-    target_dir = Path(ask("Zielverzeichnis für das Script", str(Path.home() / "scripts" / service_name))).expanduser()  # wohin kopieren (Unterordner pro Service)
+    target_dir = Path(ask("Zielverzeichnis für das Script", str(Path.home() / "scripts" / service_name))).expanduser()  # Zielordner
 
-    service_src = source_dir / f"{service_name}.service"    # Quelle der Service-Datei
-    script_src = source_dir / script_name                   # Quelle des Python-Scripts
+    service_file = source_dir / f"{service_name}.service"   # Pfad zur Service-Datei im Quellordner
+    timer_file = source_dir / f"{service_name}.timer"       # Pfad zur (optionalen) Timer-Datei
+    script_file = source_dir / script_name                  # Pfad zum Python-Script im Quellordner
+    has_timer = timer_file.exists()                         # True, wenn eine Timer-Datei existiert
 
-    for file in (service_src, script_src):                  # beide Dateien prüfen
-        if not file.exists():                               # Datei fehlt?
-            sys.exit(f"Fehler: {file} nicht gefunden")      # abbrechen
+    for required in (service_file, script_file):            # Pflichtdateien durchgehen
+        if not required.exists():                           # Datei fehlt?
+            print(f"Fehler: {required} nicht gefunden.")    # Fehlermeldung
+            return                                          # Installation abbrechen
 
-    print(f"\nKopiere {script_name} nach {target_dir}")     # Statusmeldung
-    target_dir.mkdir(parents=True, exist_ok=True)           # Ordner anlegen (kein sudo nötig)
-    shutil.copy2(script_src, target_dir / script_name)      # Script kopieren (kein sudo nötig)
+    if has_timer:                                           # Timer vorhanden?
+        print(f"Timer-Datei gefunden: {timer_file.name}")   # Info für den Nutzer
+    else:                                                   # kein Timer
+        print("Keine Timer-Datei gefunden, installiere nur den Service.")   # Info
 
-    if ask_yes_no("Gibt es eine .env-Datei zum Kopieren?"): # optionale Konfigurationsdatei
-        env_src = source_dir / ask(".env-Dateiname", ".env")    # Quelle abfragen
-        if env_src.exists():                                # existiert sie?
-            shutil.copy2(env_src, target_dir / env_src.name)    # kopieren
-            (target_dir / env_src.name).chmod(0o600)        # nur der Besitzer darf lesen/schreiben
-        else:                                               # nicht gefunden
-            print(f"Warnung: {env_src} nicht gefunden, übersprungen")   # nur warnen
-
-    print("\nInstalliere Service-Datei (hier wird sudo benötigt)")     # ab hier braucht man Root
-    run_sudo(["cp", str(service_src), str(SERVICE_DIR / f"{service_name}.service")])   # Service nach /etc/systemd/system
-    run_sudo(["systemctl", "daemon-reload"])                # systemd neue Dateien einlesen lassen
-    run_sudo(["systemctl", "enable", service_name])         # Autostart beim Booten aktivieren
-    run_sudo(["systemctl", "restart", service_name])        # Service jetzt starten
-    run_sudo(["systemctl", "status", service_name, "--no-pager"], check=False)  # Status anzeigen
-
-
-def uninstall():
-    """Fragt alle Werte ab und entfernt den Service."""
-    print("\n--- Deinstallation ---")                       # Überschrift
-    service_name = ask("Service-Name (ohne .service)", "myservice")     # Name des Services
-    script_name = ask("Name des Python-Scripts", f"{service_name}.py")  # Python-Datei
-    target_dir = Path(ask("Verzeichnis des installierten Scripts", str(Path.home() / "scripts" / service_name))).expanduser()  # wo liegt es (Unterordner pro Service)
-
-    if not ask_yes_no(f"Service '{service_name}' wirklich entfernen?"):     # Sicherheitsabfrage
+    autostart = ask_yes_no("Beim Booten automatisch starten (enable)?", "y")    # Autostart gewünscht?
+    print(f"\nQuelle:  {source_dir}\nZiel:    {target_dir}\nService: {service_name}\nTimer:   {'ja' if has_timer else 'nein'}")   # Zusammenfassung
+    if not ask_yes_no("Fortfahren?", "y"):                  # Bestätigung einholen
         print("Abgebrochen.")                               # Hinweis
         return                                              # zurück zum Menü
 
-    run_sudo(["systemctl", "stop", service_name], check=False)          # Service stoppen
-    run_sudo(["systemctl", "disable", service_name], check=False)       # Autostart abschalten
-    run_sudo(["rm", "-f", str(SERVICE_DIR / f"{service_name}.service")])    # Service-Datei löschen
+    target_dir.mkdir(parents=True, exist_ok=True)           # Zielordner anlegen (falls nötig)
+    shutil.copy2(script_file, target_dir / script_name)     # Script kopieren (ohne sudo, gehört dem User)
+    env_file = source_dir / ".env"                          # mögliche .env-Datei im Quellordner
+    if env_file.exists():                                   # existiert sie?
+        shutil.copy2(env_file, target_dir / ".env")         # dann mitkopieren
+        (target_dir / ".env").chmod(0o600)                  # nur der Besitzer darf lesen/schreiben
 
-    script_file = target_dir / script_name                  # Pfad zum kopierten Script
-    if script_file.exists():                                # existiert es noch?
-        script_file.unlink()                                # löschen (kein sudo nötig)
-        print(f"Gelöscht: {script_file}")                   # Statusmeldung
+    run_sudo(["cp", str(service_file), str(SERVICE_DIR / service_file.name)])   # Service-Datei nach /etc/systemd/system
+    if has_timer:                                           # Timer vorhanden?
+        run_sudo(["cp", str(timer_file), str(SERVICE_DIR / timer_file.name)])   # Timer-Datei ebenfalls kopieren
 
-    env_file = target_dir / ".env"                          # mögliche .env-Datei
-    if env_file.exists() and ask_yes_no(f"{env_file} ebenfalls löschen?"):  # nachfragen
-        env_file.unlink()                                   # löschen
+    run_sudo(["systemctl", "daemon-reload"])                # systemd über neue Dateien informieren
 
-    run_sudo(["systemctl", "daemon-reload"])                # systemd aktualisieren
-    run_sudo(["systemctl", "reset-failed"], check=False)    # Fehlerstatus aufräumen
-    print("Deinstallation abgeschlossen.")                  # fertig
+    if has_timer:                                           # mit Timer?
+        timer_unit = f"{service_name}.timer"                # Name der Timer-Unit
+        if autostart:                                       # Autostart gewünscht?
+            run_sudo(["systemctl", "enable", timer_unit])   # Timer beim Booten aktivieren
+        run_sudo(["systemctl", "start", timer_unit])        # Timer jetzt starten (NICHT den Service!)
+        run_sudo(["systemctl", "list-timers", timer_unit, "--no-pager"], check=False)   # nächsten Ablaufzeitpunkt anzeigen
+        run_sudo(["systemctl", "status", timer_unit, "--no-pager"], check=False)        # Timer-Status anzeigen
+    else:                                                   # ohne Timer (normaler Service)
+        if autostart:                                       # Autostart gewünscht?
+            run_sudo(["systemctl", "enable", service_name]) # Service beim Booten aktivieren
+        run_sudo(["systemctl", "start", service_name])      # Service sofort starten
+        run_sudo(["systemctl", "status", service_name, "--no-pager"], check=False)      # Status anzeigen
 
+    print("\nInstallation abgeschlossen.")                  # Erfolgsmeldung
+
+
+def uninstall():
+    """Fragt alle Werte ab und entfernt den Service (und Timer, falls vorhanden)."""
+    print("\n--- Deinstallation ---")                       # Überschrift
+    service_name = ask("Service-Name (ohne .service)", "myservice")     # Name des Services
+    target_dir = Path(ask("Verzeichnis des installierten Scripts", str(Path.home() / "scripts" / service_name))).expanduser()  # Scriptordner
+
+    service_path = SERVICE_DIR / f"{service_name}.service"  # installierte Service-Datei
+    timer_path = SERVICE_DIR / f"{service_name}.timer"      # installierte Timer-Datei
+    has_timer = timer_path.exists()                         # gibt es einen Timer?
+
+    remove_files = ask_yes_no(f"Ordner {target_dir} samt Inhalt (inkl. .env) löschen?", "n")    # Dateien auch löschen?
+    print(f"\nEntfernt wird: {service_name}" + (" (inkl. Timer)" if has_timer else ""))         # Zusammenfassung
+    if not ask_yes_no("Fortfahren?", "n"):                  # Bestätigung einholen
+        print("Abgebrochen.")                               # Hinweis
+        return                                              # zurück zum Menü
+
+    if has_timer:                                           # Timer zuerst entfernen
+        timer_unit = f"{service_name}.timer"                # Name der Timer-Unit
+        run_sudo(["systemctl", "stop", timer_unit], check=False)        # Timer stoppen (Fehler ignorieren)
+        run_sudo(["systemctl", "disable", timer_unit], check=False)     # Autostart des Timers entfernen
+        run_sudo(["rm", "-f", str(timer_path)])             # Timer-Datei löschen
+
+    run_sudo(["systemctl", "stop", service_name], check=False)          # Service stoppen (falls er gerade läuft)
+    run_sudo(["systemctl", "disable", service_name], check=False)       # Autostart entfernen (bei Timer-Services evtl. wirkungslos)
+    run_sudo(["rm", "-f", str(service_path)])               # Service-Datei löschen
+    run_sudo(["systemctl", "daemon-reload"])                # systemd neu einlesen
+    run_sudo(["systemctl", "reset-failed"], check=False)    # alte Fehlerzustände aufräumen
+
+    if remove_files and target_dir.exists():                # Ordner löschen gewünscht und vorhanden?
+        shutil.rmtree(target_dir)                           # Ordner samt Inhalt löschen (ohne sudo)
+        print(f"{target_dir} gelöscht.")                    # Info
+
+    print("\nDeinstallation abgeschlossen.")                # Erfolgsmeldung
 
 def main():
     """Zeigt das Hauptmenü und startet die gewählte Aktion."""
