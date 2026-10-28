@@ -4,7 +4,12 @@ Requires=docker.service
 After=docker.service
 
 [Service]
+EnvironmentFile=/home/pi/scripts/fhem-db-backup/.env
 Type=oneshot
 User=pi
 Group=pi
-ExecStart=/home/pi/scripts/fhem-db-backup/fhem-db-backup.py
+ExecStart=/usr/bin/python3 /home/pi/scripts/fhem-db-backup/fhem-db-backup.py
+WorkingDirectory=/home/pi/scripts/fhem-db-backup
+
+[Install]
+WantedBy=multi-user.target
