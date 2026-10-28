@@ -59,3 +59,18 @@
 |``docker compose restart mariadb``| # einzelnen Service neu starten|
 |``docker compose down``| # alle stoppen UND Container entfernen|
 |``docker compose up -d``| # Stack hochfahren (mit evtl. Config-Änderungen)|
+
+
+## Python
+
+|Befehl|Kommentar|
+|---|---|
+|``(set -a; source .env; set +a; python3 service_fhem_db_backup.py)``| # python script ausführen mit .env in eigener subshell|
+
+
+## gzip
+|Befehl|Kommentar|
+|---|---|
+|``gzip -l datei.sql.gz``| # ursprüngliche datei Grösse anzeigen.|
+|``zcat datei.sql.gz | head -n 200``| # ersten 200 Zeilen in Datei anzeigen |
+|``zcat datei.sql.gz | tail -n 50``| # liest die letzen 50 zeilen - dauert bei grossen datein |
