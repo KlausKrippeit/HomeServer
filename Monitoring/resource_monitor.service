@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 EnvironmentFile=/home/pi/scripts/.env
-ExecStart=/usr/bin/python3 /home/pi/scripts/raspi_monitor_service.py
+ExecStart=/usr/bin/python3 /home/pi/scripts/resource-monitor.py
 WorkingDirectory=/home/pi/scripts
 Restart=always
 User=pi

@@ -1,0 +1,13 @@
+[Unit]
+Description=Raspberry Pi Resource Monitor Service
+After=network.target
+
+[Service]
+EnvironmentFile=/home/pi/scripts/resource-monitor/.env
+ExecStart=/usr/bin/python3 /home/pi/scripts/resource-monitor/resource-monitor.py
+WorkingDirectory=/home/pi/scripts/resource-monitor
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
