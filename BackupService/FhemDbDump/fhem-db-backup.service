@@ -7,4 +7,4 @@ After=docker.service
 Type=oneshot
 User=pi
 Group=pi
-ExecStart=/home/pi/scripts/fhem_db_backup/service_fhem_db_backup.py
+ExecStart=/home/pi/scripts/fhem-db-backup/fhem-db-backup.py

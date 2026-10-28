@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly FHEM MariaDB backup timer
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00
+Persistent=true
+Unit=fhem-db-backup.service
+
+[Install]
+WantedBy=timers.target
