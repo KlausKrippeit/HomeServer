@@ -1,0 +1,10 @@
+[Unit]
+Description=MariaDB FHEM history table backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+ExecStart=/home/pi/scripts/fhem_db_backup/service_fhem_db_backup.py
