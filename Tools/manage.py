@@ -115,7 +115,8 @@ def uninstall():
         run_sudo(["rm", "-f", str(timer_path)])             # Timer-Datei löschen
 
     run_sudo(["systemctl", "stop", service_name], check=False)          # Service stoppen (falls er gerade läuft)
-    run_sudo(["systemctl", "disable", service_name], check=False)       # Autostart entfernen (bei Timer-Services evtl. wirkungslos)
+    if not has_timer:                                                   # nur bei reinen Services (ohne Timer)
+        run_sudo(["systemctl", "disable", service_name], check=False)       # Autostart entfernen (bei Timer-Services evtl. wirkungslos)
     run_sudo(["rm", "-f", str(service_path)])               # Service-Datei löschen
     run_sudo(["systemctl", "daemon-reload"])                # systemd neu einlesen
     run_sudo(["systemctl", "reset-failed"], check=False)    # alte Fehlerzustände aufräumen
