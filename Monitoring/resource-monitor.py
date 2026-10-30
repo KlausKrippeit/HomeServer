@@ -11,6 +11,7 @@ import psutil
 import subprocess
 import time
 import logging
+from logging.handlers import RotatingFileHandler
 
 FHEM_URL      = os.getenv("FHEM_URL", "http://localhost:8083/fhem")
 FHEM_USER     = os.getenv("FHEM_USER", "")
@@ -30,12 +31,24 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s"
 )
+log = logging.getLogger(__name__)
+
+# Eigener Info-Logger, schreibt nur in eine Datei im RAM
+INFO_LOG_FILE = "/tmp/fhem-monitor-info.log"  # alternativ /dev/shm/...
+
+info_log = logging.getLogger("monitor.info")  # eigener Name = eigener Logger
+info_log.setLevel(logging.INFO)               # nur INFO und höher
+info_log.propagate = False                    # nicht zusätzlich an journald weitergeben
+
+_handler = RotatingFileHandler(INFO_LOG_FILE, maxBytes=500_000, backupCount=1)  # max ca. 1 MB gesamt
+_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+info_log.addHandler(_handler)
 
 def get_csrf_token() -> str:
     global _csrf_token
     if _csrf_token is not None:
         return _csrf_token
-
+    info_log.info("FHEM Token neu beziehen!")  # nur in /tmp-Datei
     """Ruft die FHEM-Seite ab und extrahiert das CSRF-Token."""
     try:
         response = session.get(FHEM_URL, timeout=10)
@@ -54,6 +67,7 @@ def get_csrf_token() -> str:
     return match.group(1)
 
 def send_value(reading: str, value: str) -> None:
+    global _csrf_token
     """Sendet den Wert an die FHEM-API."""
 
     if value is None:
@@ -61,7 +75,7 @@ def send_value(reading: str, value: str) -> None:
         return
 
     csrf_token = get_csrf_token()
-    if _csrf_token is None:
+    if csrf_token is None:
         return False
 
     payload = {
@@ -72,9 +86,11 @@ def send_value(reading: str, value: str) -> None:
     try:
         api_response = session.post(FHEM_URL, data=payload, timeout=10)
         api_response.raise_for_status()
+        info_log.info("FHEM Wert %s=%s gesendet!", reading, value)  # nur in /tmp-Datei
         #logging.info("FHEM Wert %s=%s gesendet!", reading, value)
         return True
     except Exception as e:
+        _csrf_token = None
         logging.warning("FHEM nicht erreichbar, Wert %s=%s nicht gesendet: %s", reading, value, e)
         return False
 
