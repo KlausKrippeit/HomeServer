@@ -116,6 +116,12 @@ def mail_report():
     return redirect(url_for('index', month=month_value, message=message))
 
 
+@app.get('/favicon.ico')
+def favicon():
+    """Liefert das Favicon für direkte Browser-Anfragen."""
+    return app.send_static_file('favicon.ico')
+
+
 @app.get('/sw.js')
 def service_worker():
     """Liefert den Service Worker mit Gültigkeit für den Stamm-Pfad."""
