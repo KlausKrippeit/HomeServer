@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>Ausgabe eintragen</h1>
+<p class="user">Angemeldet als {{ user }}</p>
+{% if msg %}<div class="meldung">{{ msg }}</div>{% endif %}
+<form action="{{ url_for('eintragen') }}" method="post">
+  <label class="visuell-versteckt" for="text">Ausgabe</label>
+  <input id="text" name="text" placeholder="z.B. 12,50 Rewe" autocomplete="off" required>
+  <button type="submit">Speichern</button>
+</form>
+<h2>Zuletzt</h2>
+<ul class="liste">
+{% for datum, betrag, beschreibung in letzte %}
+  <li><span>{{ datum }}</span><span>{{ beschreibung }}</span><strong>{{ "%.2f"|format(betrag) }} EUR</strong></li>
+{% else %}
+  <li class="leer">Noch keine Eintraege.</li>
+{% endfor %}
+</ul>
+<form class="aktion" action="{{ url_for('loeschen') }}" method="post"><button class="sekundaer" type="submit">Letzten Eintrag loeschen</button></form>
+<form class="aktion" action="{{ url_for('mailen') }}" method="post"><button class="sekundaer" type="submit">Monatsauswertung per Mail</button></form>
+<p class="fuss"><a href="{{ url_for('logout') }}">Abmelden</a></p>
+{% endblock %}

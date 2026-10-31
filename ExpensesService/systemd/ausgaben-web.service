@@ -1,0 +1,12 @@
+[Unit]
+Description=Ausgaben Weboberflaeche
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/ausgaben-bot
+ExecStart=/home/pi/ausgaben-bot/venv/bin/waitress-serve --listen=0.0.0.0:8080 web:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
