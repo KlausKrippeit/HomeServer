@@ -20,10 +20,16 @@ def parse_users(raw_users):
     return users
 
 
-def parse_categories(raw_categories):
-    """Liefert bereinigte Kategorien mit einer Ersatzkategorie."""
-    categories = [item.strip() for item in raw_categories.split(',') if item.strip()]
-    return categories or ['Other']
+def parse_category_map(raw_categories, defaults=None):
+    """Ergänzt Standardzuordnungen mit Einträgen aus der Umgebung."""
+    category_map = dict(defaults or {})
+    for entry in raw_categories.split(','):
+        if '=' not in entry:
+            continue
+        keyword, category = (part.strip() for part in entry.split('=', 1))
+        if keyword and category:
+            category_map[keyword.casefold()] = category
+    return category_map
 
 
 USERS = parse_users(os.getenv('USERS', ''))
@@ -37,6 +43,24 @@ SMTP_USER = os.getenv('SMTP_USER', '')
 SMTP_PASS = os.getenv('SMTP_PASS', '')
 MAIL_FROM = os.getenv('MAIL_FROM', '')
 MAIL_TO = os.getenv('MAIL_TO', '')
-CATEGORIES = parse_categories(
-    os.getenv('CATEGORIES', 'Food,Transport,Home,Health,Other')
-)
+DEFAULT_CATEGORY = 'Other'
+CATEGORY_MAP = {
+    'rewe': 'Lebensmittel',
+    'edeka': 'Lebensmittel',
+    'aldi': 'Lebensmittel',
+    'lidl': 'Lebensmittel',
+    'dm': 'Drogerie',
+    'rossmann': 'Drogerie',
+    'tanken': 'Auto',
+    'shell': 'Auto',
+    'aral': 'Auto',
+    'restaurant': 'Essen gehen',
+    'pizza': 'Essen gehen',
+    'kaffee': 'Essen gehen',
+    'miete': 'Wohnen',
+    'strom': 'Wohnen',
+    'internet': 'Wohnen',
+    'kino': 'Freizeit',
+    'netflix': 'Freizeit',
+}
+CATEGORY_MAP = parse_category_map(os.getenv('CATEGORIES', ''), CATEGORY_MAP)

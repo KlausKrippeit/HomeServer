@@ -10,11 +10,11 @@ Kleine, selbst betriebene Ausgabenliste mit Flask und SQLite. Die Oberfläche pa
    - Windows: `py -m venv venv` und `venv\Scripts\activate`
 3. Abhängigkeiten installieren: `pip install -r requirements.txt`.
 4. Konfiguration kopieren: `cp .env.example .env` (Windows: `copy .env.example .env`).
-5. In `.env` mindestens `SECRET_KEY` und `USERS` ändern. Nutzer werden als `name:kennwort` eingetragen; mehrere Nutzer werden mit Kommas getrennt. Außerdem können Kategorien, Datenbankpfad, Bind-Adresse und E-Mail-Versand eingestellt werden.
+5. In `.env` mindestens `SECRET_KEY` und `USERS` ändern. Nutzer werden als `name:kennwort` eingetragen; mehrere Nutzer werden mit Kommas getrennt. Außerdem können Kategorie-Stichwörter, Datenbankpfad, Bind-Adresse und E-Mail-Versand eingestellt werden.
 6. Symbole erzeugen: `python gen-icons.py`.
 7. Lokal starten: `python web.py`. Die Standardadresse ist `http://127.0.0.1:8080`.
 
-Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `EUR 8.90 Bus pass` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird als erster Kategoriename erkannt, der in der Beschreibung vorkommt; andernfalls gilt die letzte konfigurierte Kategorie. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
+Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `EUR 8.90 Bus pass` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird anhand passender Stichwörter in der Beschreibung erkannt. Standardzuordnungen sind in `config.py` hinterlegt; unbekannte Stichwörter erhalten die Ersatzkategorie `Other`. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
 
 ## Monatsübersicht und E-Mail-Bericht
 
@@ -49,7 +49,7 @@ Die Web-App muss über HTTPS erreichbar sein, damit iOS den Service Worker zuver
 
 ## Konfiguration
 
-Alle Einstellungen werden mit `os.getenv` aus `.env` gelesen: `USERS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `MAIL_TO` und `CATEGORIES`. Die Beispieldatei enthält Erläuterungen auf Deutsch.
+Die Einstellungen werden mit `os.getenv` aus `.env` gelesen. `CATEGORIES` akzeptiert kommaseparierte Zuordnungen im Format `stichwort=Kategorie`, zum Beispiel `markt=Lebensmittel,apotheke=Drogerie`. Diese Einträge ergänzen die Standardzuordnungen oder überschreiben ein vorhandenes Stichwort, etwa `rewe=Einkauf`. Die Stichwörter werden ohne Beachtung der Groß-/Kleinschreibung gesucht. Unbekannte Stichwörter erhalten `Other`. Die übrigen Einstellungen sind `USERS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` und `MAIL_TO`.
 
 ## Hinweis zu Dateinamen
 

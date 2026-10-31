@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from config import CATEGORIES, DB_PATH
+from config import CATEGORY_MAP, DB_PATH, DEFAULT_CATEGORY
 
 AMOUNT_PATTERN = re.compile(
     r'(?i)(?:(?:euro|eur\b|€)\s*)?(\d+(?:[.,]\d{1,2})?)'
@@ -31,10 +31,10 @@ def get_connection():
 def find_category(description):
     """Ordnet anhand des Beschreibungstextes die erste passende Kategorie zu."""
     lowered_description = description.casefold()
-    for category in CATEGORIES:
-        if category.casefold() in lowered_description:
+    for keyword, category in CATEGORY_MAP.items():
+        if keyword in lowered_description:
             return category
-    return CATEGORIES[-1]
+    return DEFAULT_CATEGORY
 
 
 def parse_input(raw_input):

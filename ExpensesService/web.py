@@ -4,7 +4,7 @@ from functools import wraps
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from config import BIND_HOST, BIND_PORT, CATEGORIES, SECRET_KEY, USERS
+from config import BIND_HOST, BIND_PORT, SECRET_KEY, USERS
 from db import add_expense, delete_latest, get_month
 from report import send_mail
 
@@ -69,7 +69,7 @@ def index():
     expenses = get_month(selected_month.year, selected_month.month)
     total = sum(float(expense['amount']) for expense in expenses)
     return render_template(
-        'index.html', expenses=expenses, categories=CATEGORIES,
+        'index.html', expenses=expenses,
         selected_month=selected_month.strftime('%Y-%m'), total=total,
         message=request.args.get('message', ''),
     )
