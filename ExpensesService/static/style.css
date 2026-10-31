@@ -1,0 +1,48 @@
+:root {
+  --akzent: #0a60ff;
+  --grau: #f2f2f7;
+  --text: #1c1c1e;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: max(24px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+  color: var(--text);
+  background: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.45;
+}
+main { max-width: 480px; margin: 8vh auto 0; }
+h1 { margin: 0 0 8px; font-size: clamp(2rem, 9vw, 2.6rem); letter-spacing: -0.045em; }
+h2 { margin: 32px 0 10px; font-size: 1.2rem; }
+.user { margin: 0 0 24px; color: #666; }
+label { display: block; margin: 18px 0 6px; font-weight: 600; }
+input, button {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 15px;
+  border: 1px solid #d8d8df;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 1.1em;
+}
+input { margin-bottom: 12px; background: #fff; color: var(--text); }
+input:focus { outline: 3px solid #0a60ff33; border-color: var(--akzent); }
+button { border: 0; background: var(--akzent); color: #fff; font-weight: 650; cursor: pointer; }
+button:active { transform: scale(.99); }
+button.sekundaer { background: var(--grau); color: var(--text); }
+.meldung, .fehler { padding: 12px 14px; margin: 18px 0; border-radius: 12px; }
+.meldung { background: #eaf1ff; color: #17489d; }
+.fehler { background: #fff0f0; color: #b42318; }
+.liste { display: grid; grid-template-columns: auto 1fr auto; padding: 0; margin: 0; list-style: none; }
+.liste li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid #e6e6eb; }
+.liste li span:first-child { color: #777; font-size: .88rem; }
+.liste li span:nth-child(2) { overflow-wrap: anywhere; }
+.liste strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.liste .leer { display: block; color: #777; }
+.aktion { margin-top: 12px; }
+.fuss { margin-top: 30px; text-align: center; }
+a { color: var(--akzent); }
+.visuell-versteckt { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 360px) { .liste li { gap: 6px; } .liste li span:first-child { font-size: .78rem; } }
