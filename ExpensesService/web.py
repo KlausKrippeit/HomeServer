@@ -66,7 +66,7 @@ def index():
         )
     except ValueError:
         selected_month = today.replace(day=1)
-    expenses = get_month(selected_month.year, selected_month.month)
+    expenses = get_month(session['user_name'], selected_month.year, selected_month.month)
     total = sum(float(expense['amount']) for expense in expenses)
     return render_template(
         'index.html', expenses=expenses,

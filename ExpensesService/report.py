@@ -11,7 +11,7 @@ def build_report(year=None, month=None):
     today = date.today()
     year = year or today.year
     month = month or today.month
-    rows = get_month(year, month)
+    rows = get_month('dev',year, month)
     lines = [f'Expense report — {year:04d}-{month:02d}', '', f'Entries: {len(rows)}']
     total = sum(float(row['amount']) for row in rows)
     lines.extend((f'Total: EUR {total:.2f}', ''))

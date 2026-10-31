@@ -95,12 +95,15 @@ def delete_latest(user_name):
         ).fetchone()
         if row is None:
             return False
-        connection.execute('DELETE FROM expenses WHERE id = ?', (row['id'],))
+        connection.execute(
+            'DELETE FROM expenses WHERE id = ? AND user_name = ?',
+            (row['id'], user_name),
+        )
         return True
 
 
-def get_month(year=None, month=None):
-    """Liefert alle Einträge des angegebenen oder aktuellen Monats."""
+def get_month(user_name, year=None, month=None):
+    """Liefert alle Einträge des Nutzers für den angegebenen oder aktuellen Monat."""
     today = date.today()
     year = year or today.year
     month = month or today.month
@@ -111,7 +114,8 @@ def get_month(year=None, month=None):
     with get_connection() as connection:
         return connection.execute(
             'SELECT id, expense_date, user_name, amount, description, category '
-            'FROM expenses WHERE expense_date >= ? AND expense_date < ? '
+            'FROM expenses WHERE user_name = ? '
+            'AND expense_date >= ? AND expense_date < ? '
             'ORDER BY expense_date DESC, id DESC',
-            (month_start, month_end),
+            (user_name, month_start, month_end),
         ).fetchall()
