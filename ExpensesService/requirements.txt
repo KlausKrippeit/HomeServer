@@ -1,4 +1,4 @@
-flask
-python-dotenv
-waitress
-pillow
+Flask>=3.0,<4
+python-dotenv>=1.0,<2
+waitress>=3.0,<4
+Pillow>=10.0,<13
