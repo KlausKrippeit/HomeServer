@@ -14,7 +14,7 @@ Kleine, selbst betriebene Ausgabenliste mit Flask und SQLite. Die Oberfläche pa
 6. Symbole erzeugen: `python gen-icons.py`.
 7. Lokal starten: `python web.py`. Die Standardadresse ist `http://127.0.0.1:8080`.
 
-Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `8,90 EUR Monatskarte` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird anhand passender Stichwörter in der Beschreibung erkannt. Standardzuordnungen sind in `config.py` hinterlegt; unbekannte Stichwörter erhalten intern die Ersatzkategorie `Other`, die in der Oberfläche als „Sonstiges“ angezeigt wird. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
+Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `48,90 EUR Monatskarte` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird anhand passender Stichwörter in der Beschreibung erkannt. Standardzuordnungen sind in `config.py` hinterlegt; unbekannte Stichwörter erhalten intern die Ersatzkategorie `Other`, die in der Oberfläche als „Sonstiges“ angezeigt wird. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
 
 ## Monatsübersicht und E-Mail-Bericht
 

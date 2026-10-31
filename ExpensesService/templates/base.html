@@ -24,7 +24,7 @@
       </a>
         {% if session.get('user_name') %}
           <span class="account">
-            { { session.get( 'user_name' ) } }
+            {{ session.get( 'user_name' ) }}
           </span>
         {% endif %}
     </header>
