@@ -7,18 +7,18 @@ from db import get_month
 
 
 def build_report(year=None, month=None):
-    """Erstellt den englischsprachigen Textbericht für einen Monat."""
+    """Erstellt den deutschsprachigen Textbericht für einen Monat."""
     today = date.today()
     year = year or today.year
     month = month or today.month
-    rows = get_month('dev',year, month)
-    lines = [f'Expense report — {year:04d}-{month:02d}', '', f'Entries: {len(rows)}']
+    rows = get_month(year, month)
+    lines = [f'Ausgabenbericht — {month:02d}/{year:04d}', '', f'Einträge: {len(rows)}']
     total = sum(float(row['amount']) for row in rows)
-    lines.extend((f'Total: EUR {total:.2f}', ''))
+    lines.extend((f'Gesamtsumme: {total:.2f}'.replace('.', ',') + ' €', ''))
     for row in rows:
         lines.append(
             f"{row['expense_date']} | {row['user_name']} | "
-            f"EUR {float(row['amount']):.2f} | {row['category']} | {row['description']}"
+            f"{float(row['amount']):.2f}".replace('.', ',') + f" € | {'Sonstiges' if row['category'] == 'Other' else row['category']} | {row['description']}"
         )
     return '\n'.join(lines)
 
@@ -26,12 +26,12 @@ def build_report(year=None, month=None):
 def send_mail(year=None, month=None):
     """Versendet den Monatsbericht über SMTP mit STARTTLS."""
     if not all((SMTP_HOST, MAIL_FROM, MAIL_TO)):
-        raise RuntimeError('SMTP_HOST, MAIL_FROM, and MAIL_TO must be configured.')
+        raise RuntimeError('SMTP_HOST, MAIL_FROM und MAIL_TO müssen konfiguriert sein.')
     today = date.today()
     report_year = year or today.year
     report_month = month or today.month
     message = EmailMessage()
-    message['Subject'] = f'Expense report {report_year:04d}-{report_month:02d}'
+    message['Subject'] = f'Ausgabenbericht {report_month:02d}/{report_year:04d}'
     message['From'] = MAIL_FROM
     message['To'] = MAIL_TO
     message.set_content(build_report(report_year, report_month))

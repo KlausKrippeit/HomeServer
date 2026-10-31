@@ -2,6 +2,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+
 OUTPUT_DIR = Path(__file__).parent / 'static'
 ICON_SIZES = (180, 192, 512)
 FAVICON_SIZES = (16, 32, 48)

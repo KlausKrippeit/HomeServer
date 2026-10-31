@@ -1,6 +1,6 @@
 {
-  "name": "ExpensesService",
-  "short_name": "Expenses",
+  "name": "Ausgabenübersicht",
+  "short_name": "Ausgaben",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f2e9d8",
