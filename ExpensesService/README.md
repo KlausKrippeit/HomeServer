@@ -1,35 +1,56 @@
-# Ausgaben-Bot
+# ExpensesService
 
-Kleine Flask-Webanwendung zum Erfassen gemeinsamer Ausgaben und zum Versenden einer Monatsauswertung.
+Kleine, selbst betriebene Ausgabenliste mit Flask und SQLite. Die Oberfläche passt sich Mobiltelefonen an und kann auf dem iPhone als Web-App installiert werden.
 
-## Installation
+## Installation und virtuelle Umgebung
 
-```sh
-cd /home/pi/ausgaben-bot
-python3 -m venv venv
-. venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-nano .env
-chmod 600 .env
-```
+1. Projekt in ein eigenes Verzeichnis entpacken und dorthin wechseln.
+2. Eine virtuelle Umgebung anlegen und aktivieren:
+   - Linux/macOS: `python3 -m venv venv` und `source venv/bin/activate`
+   - Windows: `py -m venv venv` und `venv\Scripts\activate`
+3. Abhängigkeiten installieren: `pip install -r requirements.txt`.
+4. Konfiguration kopieren: `cp .env.example .env` (Windows: `copy .env.example .env`).
+5. In `.env` mindestens `SECRET_KEY` und `USERS` ändern. Nutzer werden als `name:kennwort` eingetragen; mehrere Nutzer werden mit Kommas getrennt. Außerdem können Kategorien, Datenbankpfad, Bind-Adresse und E-Mail-Versand eingestellt werden.
+6. Symbole erzeugen: `python gen-icons.py`.
+7. Lokal starten: `python web.py`. Die Standardadresse ist `http://127.0.0.1:8080`.
 
-In `.env` Benutzer, Passwoerter, `SECRET_KEY`, Datenbankpfad und SMTP-Zugangsdaten eintragen. Den Dienst installieren und starten:
+Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `EUR 8.90 Bus pass` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird als erster Kategoriename erkannt, der in der Beschreibung vorkommt; andernfalls gilt die letzte konfigurierte Kategorie. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
 
-```sh
-sudo cp systemd/ausgaben-web.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now ausgaben-web.service
-```
+## Monatsübersicht und E-Mail-Bericht
 
-Monatsbericht am Monatsende per Cron versenden (zum Beispiel in der Crontab von `pi`):
+Die Monatsauswahl auf der Startseite filtert die angezeigten Einträge. Die Schaltfläche zum Versenden erstellt den Bericht für den ausgewählten Monat. Dafür müssen `SMTP_HOST`, `MAIL_FROM` und `MAIL_TO` konfiguriert sein. Der Versand verwendet STARTTLS; `SMTP_USER` und `SMTP_PASS` sind optional.
+
+Das Skript `monthly-mail.py` versendet den Bericht des laufenden Monats ausschließlich, wenn es am letzten Kalendertag des Monats gestartet wird. Beispiel für einen täglichen Cron-Aufruf (Pfade anpassen):
 
 ```cron
-0 20 * * * cd /home/pi/ausgaben-bot && /home/pi/ausgaben-bot/venv/bin/python monatsmail.py
+5 23 * * * /home/pi/ExpensesService/venv/bin/python /home/pi/ExpensesService/monthly-mail.py
 ```
 
-## iPhone
+## systemd
 
-Die Anwendung in Safari oeffnen, auf Teilen tippen und „Zum Home-Bildschirm“ waehlen. Der Service Worker funktioniert nur ueber HTTPS (oder lokal auf `localhost`).
+Die Beispieldatei `systemd/expenses-service.service` erwartet das Projekt unter `/home/pi/ExpensesService` sowie eine virtuelle Umgebung im Unterordner `venv`. Pfad und Benutzer `pi` müssen an das eigene System angepasst werden. Danach:
 
-Den Anwendungsport nicht im Router ins Internet freigeben. `.env` enthaelt Zugangsdaten und darf niemals in Git eingecheckt werden.
+```sh
+sudo cp systemd/expenses-service.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now expenses-service.service
+sudo systemctl status expenses-service.service
+```
+
+Die systemd-Datei lädt `.env`; der Start über `python web.py` berücksichtigt `BIND_HOST` und `BIND_PORT`.
+
+## Installation auf dem iPhone
+
+Die Web-App muss über HTTPS erreichbar sein, damit iOS den Service Worker zuverlässig verwenden kann. In Safari die Seite öffnen, die Teilen-Taste wählen und „Zum Home-Bildschirm“ antippen. Das Manifest sowie `apple-touch-icon` und die weiteren PWA-Bilddateien werden vom Projekt bereitgestellt.
+
+## Sicherheit
+
+**Nicht direkt ins Internet freigeben.** Der Dienst enthält keinen Schutz wie eine vollständige öffentliche Webanwendung. Betreibe ihn nur in einem vertrauenswürdigen privaten Netz oder hinter einem korrekt abgesicherten HTTPS-Reverse-Proxy. Verwende ein starkes, geheimes `SECRET_KEY`, sichere `.env` und die Datenbank und beschränke den Zugriff auf den Rechner und die E-Mail-Konfiguration.
+
+## Konfiguration
+
+Alle Einstellungen werden mit `os.getenv` aus `.env` gelesen: `USERS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `MAIL_TO` und `CATEGORIES`. Die Beispieldatei enthält Erläuterungen auf Deutsch.
+
+## Hinweis zu Dateinamen
+
+`monthly-mail.py` und `gen-icons.py` enthalten Bindestriche. Sie werden als Skripte gestartet, nicht als Python-Module importiert. Die importierten Module haben Dateinamen ohne Bindestriche: `config.py`, `db.py`, `report.py` und `web.py`.

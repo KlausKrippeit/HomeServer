@@ -1,39 +1,42 @@
-from collections import defaultdict
-from email.message import EmailMessage
 import smtplib
-import config
-import db
+from datetime import date
+from email.message import EmailMessage
+
+from config import MAIL_FROM, MAIL_TO, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER
+from db import get_month
 
 
-def auswertung(jahr, monat):
-    zeilen = db.monat(jahr, monat)
-    kopf = f"Ausgaben {monat:02d}/{jahr}"
-    if not zeilen:
-        return f"Keine Ausgaben im {monat:02d}/{jahr}."
-    text = [kopf, "-" * len(kopf)]
-    personen = defaultdict(float)
-    kategorien = defaultdict(float)
-    gesamt = 0.0
-    for datum, name, betrag, beschreibung, kategorie in zeilen:
-        text.append(f"{datum}  {name:<10} {betrag:>8.2f} EUR  {beschreibung} ({kategorie})")
-        personen[name] += betrag
-        kategorien[kategorie or "Sonstiges"] += betrag
-        gesamt += betrag
-    text.extend(["", "Summe pro Person:"])
-    text.extend(f"{name}: {betrag:.2f} EUR" for name, betrag in sorted(personen.items()))
-    text.extend(["", "Summe pro Kategorie:"])
-    text.extend(f"{name}: {betrag:.2f} EUR" for name, betrag in sorted(kategorien.items()))
-    text.extend(["", f"Gesamt: {gesamt:.2f} EUR"])
-    return "\n".join(text)
+def build_report(year=None, month=None):
+    """Erstellt den englischsprachigen Textbericht für einen Monat."""
+    today = date.today()
+    year = year or today.year
+    month = month or today.month
+    rows = get_month(year, month)
+    lines = [f'Expense report — {year:04d}-{month:02d}', '', f'Entries: {len(rows)}']
+    total = sum(float(row['amount']) for row in rows)
+    lines.extend((f'Total: EUR {total:.2f}', ''))
+    for row in rows:
+        lines.append(
+            f"{row['expense_date']} | {row['user_name']} | "
+            f"EUR {float(row['amount']):.2f} | {row['category']} | {row['description']}"
+        )
+    return '\n'.join(lines)
 
 
-def mail_senden(betreff, text):
-    msg = EmailMessage()
-    msg["Subject"] = betreff
-    msg["From"] = config.MAIL_VON
-    msg["To"] = [adresse.strip() for adresse in config.MAIL_AN.split(",") if adresse.strip()]
-    msg.set_content(text)
-    with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as smtp:
-        smtp.starttls()
-        smtp.login(config.SMTP_USER, config.SMTP_PASS)
-        smtp.send_message(msg)
+def send_mail(year=None, month=None):
+    """Versendet den Monatsbericht über SMTP mit STARTTLS."""
+    if not all((SMTP_HOST, MAIL_FROM, MAIL_TO)):
+        raise RuntimeError('SMTP_HOST, MAIL_FROM, and MAIL_TO must be configured.')
+    today = date.today()
+    report_year = year or today.year
+    report_month = month or today.month
+    message = EmailMessage()
+    message['Subject'] = f'Expense report {report_year:04d}-{report_month:02d}'
+    message['From'] = MAIL_FROM
+    message['To'] = MAIL_TO
+    message.set_content(build_report(report_year, report_month))
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+        server.starttls()
+        if SMTP_USER:
+            server.login(SMTP_USER, SMTP_PASS)
+        server.send_message(message)

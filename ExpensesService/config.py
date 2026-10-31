@@ -1,42 +1,42 @@
 import os
-from pathlib import Path
+
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
-BASIS = Path(__file__).resolve().parent
-load_dotenv(BASIS / ".env")
+load_dotenv()
 
 
-def _parse_nutzer(roh):
-    nutzer = {}
-    for eintrag in roh.split(","):
-        name, _, pw = eintrag.strip().partition(":")
-        if name and pw:
-            nutzer[name] = generate_password_hash(pw)
-    return nutzer
+def parse_users(raw_users):
+    """Liest Nutzer und Kennwörter aus der Umgebungsvariable."""
+    users = {}
+    for entry in raw_users.split(','):
+        entry = entry.strip()
+        if not entry or ':' not in entry:
+            continue
+        user_name, password = entry.split(':', 1)
+        user_name = user_name.strip()
+        if user_name and password:
+            users[user_name] = generate_password_hash(password)
+    return users
 
 
-def _parse_kategorien(roh):
-    kat = {}
-    for eintrag in roh.split(","):
-        stichwort, _, name = eintrag.partition("=")
-        if stichwort.strip() and name.strip():
-            kat[stichwort.strip().lower()] = name.strip()
-    return kat
+def parse_categories(raw_categories):
+    """Liefert bereinigte Kategorien mit einer Ersatzkategorie."""
+    categories = [item.strip() for item in raw_categories.split(',') if item.strip()]
+    return categories or ['Other']
 
 
-SECRET_KEY = os.getenv("SECRET_KEY") or os.urandom(32)
-DB_PFAD = Path(os.getenv("DB_PFAD", BASIS / "ausgaben.db"))
-NUTZER = _parse_nutzer(os.getenv("NUTZER", ""))
-KATEGORIEN = _parse_kategorien(os.getenv("KATEGORIEN", ""))
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-MAIL_VON = os.getenv("MAIL_VON", "")
-MAIL_AN = os.getenv("MAIL_AN", "")
-BIND_HOST = os.getenv("BIND_HOST", "0.0.0.0")
-BIND_PORT = int(os.getenv("BIND_PORT", 8080))
-
-if not NUTZER:
-    raise SystemExit("NUTZER fehlt oder ist fehlerhaft in der .env")
+USERS = parse_users(os.getenv('USERS', ''))
+SECRET_KEY = os.getenv('SECRET_KEY', 'development-only-change-this-secret')
+DB_PATH = os.getenv('DB_PATH', 'expenses.db')
+BIND_HOST = os.getenv('BIND_HOST', '127.0.0.1')
+BIND_PORT = int(os.getenv('BIND_PORT', '8080'))
+SMTP_HOST = os.getenv('SMTP_HOST', '')
+SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+SMTP_USER = os.getenv('SMTP_USER', '')
+SMTP_PASS = os.getenv('SMTP_PASS', '')
+MAIL_FROM = os.getenv('MAIL_FROM', '')
+MAIL_TO = os.getenv('MAIL_TO', '')
+CATEGORIES = parse_categories(
+    os.getenv('CATEGORIES', 'Food,Transport,Home,Health,Other')
+)

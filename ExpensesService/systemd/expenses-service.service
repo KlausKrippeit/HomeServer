@@ -1,0 +1,14 @@
+[Unit]
+Description=Webdienst für die persönliche Ausgabenverwaltung
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/ExpensesService
+EnvironmentFile=/home/pi/ExpensesService/.env
+ExecStart=/home/pi/ExpensesService/venv/bin/python /home/pi/ExpensesService/web.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

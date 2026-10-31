@@ -1,24 +1,23 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>{% block titel %}Ausgaben{% endblock %}</title>
+  <meta name="theme-color" content="#193b36">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Ausgaben">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#ffffff">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>{% block title %}Expenses{% endblock %}</title>
+  <script>if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register("{{ url_for('service_worker') }}")); }</script>
 </head>
 <body>
-  <main>{% block inhalt %}{% endblock %}</main>
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("{{ url_for('service_worker') }}");
-    }
-  </script>
+  <main class="page-shell">
+    <header class="masthead"><a class="wordmark" href="{{ url_for('index') if session.get('user_name') else url_for('login') }}">FIELDNOTES <span>/</span> EXPENSES</a>{% if session.get('user_name') %}<span class="account">{{ session.get('user_name') }}</span>{% endif %}</header>
+    {% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+    {% block content %}{% endblock %}
+    <footer class="page-footer">A clear record, one entry at a time.</footer>
+  </main>
 </body>
 </html>
