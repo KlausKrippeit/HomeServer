@@ -42,7 +42,7 @@ def login_post():
         session['user_name'] = user_name
         return redirect(url_for('index'))
     return redirect(
-        url_for('login', message='The username or password was not recognized.')
+        url_for('login', message='Benutzername oder Passwort ist nicht korrekt.')
     )
 
 
@@ -50,7 +50,7 @@ def login_post():
 def logout():
     """Beendet die aktuelle Sitzung."""
     session.clear()
-    return redirect(url_for('login', message='You have signed out.'))
+    return redirect(url_for('login', message='Du hast dich abgemeldet.'))
 
 
 @app.get('/')
@@ -83,7 +83,7 @@ def add_expense_view():
         add_expense(session['user_name'], request.form.get('expense', ''))
     except ValueError as error:
         return redirect(url_for('index', message=str(error)))
-    return redirect(url_for('index', message='Expense saved.'))
+    return redirect(url_for('index', message='Ausgabe gespeichert.'))
 
 
 @app.post('/delete-latest')
@@ -92,8 +92,8 @@ def delete_latest_view():
     """Entfernt den jüngsten Eintrag des angemeldeten Nutzers."""
     removed = delete_latest(session['user_name'])
     message = (
-        'Latest expense deleted.' if removed
-        else 'There are no expenses to delete.'
+        'Letzter Eintrag gelöscht.' if removed
+        else 'Es gibt keine Einträge zum Löschen.'
     )
     return redirect(url_for('index', message=message))
 
@@ -109,10 +109,10 @@ def mail_report():
             if month_value else date.today()
         )
         send_mail(selected_month.year, selected_month.month)
-        message = 'Monthly report sent.'
+        message = 'Monatsbericht wurde gesendet.'
     except Exception:
-        app.logger.exception('Unable to send the expense report')
-        message = 'The report could not be sent. Check the mail configuration.'
+        app.logger.exception('Der Ausgabenbericht konnte nicht gesendet werden')
+        message = 'Der Bericht konnte nicht gesendet werden. Prüfe die E-Mail-Konfiguration.'
     return redirect(url_for('index', month=month_value, message=message))
 
 

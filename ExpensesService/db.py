@@ -42,20 +42,20 @@ def parse_input(raw_input):
     normalized_input = raw_input.strip()
     match = AMOUNT_PATTERN.search(normalized_input)
     if not match:
-        raise ValueError('Enter an amount followed by a description.')
+        raise ValueError('Gib einen Betrag mit anschließender Beschreibung ein.')
     try:
         amount = Decimal(match.group(1).replace(',', '.'))
     except InvalidOperation as error:
-        raise ValueError('Enter a valid amount.') from error
+        raise ValueError('Gib einen gültigen Betrag ein.') from error
     if amount <= 0 or amount > Decimal('10000000'):
         raise ValueError(
-            'Amount must be greater than zero and within the supported limit.'
+            'Der Betrag muss größer als null sein und innerhalb des zulässigen Höchstbetrags liegen.'
         )
     description = (
         normalized_input[:match.start()] + ' ' + normalized_input[match.end():]
     ).strip(' ,.-')
     if not description:
-        raise ValueError('Add a description after the amount.')
+        raise ValueError('Füge nach dem Betrag eine Beschreibung hinzu.')
     return round(float(amount), 2), description, find_category(description)
 
 

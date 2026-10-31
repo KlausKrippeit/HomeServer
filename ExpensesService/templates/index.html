@@ -1,68 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}AUSGABEN · ÜBERSICHT{% endblock %}
+{% block title %}Ausgaben · Übersicht{% endblock %}
 {% block content %}
-<section class="hero-row">
-  <div>
-    <p class="eyebrow">PERSONAL FINANCE / OVERVIEW</p>
-    <h1>Your expense<br><em>ledger.</em></h1>
-  </div><a class="text-link" href="{{ url_for('logout') }}">Sign out</a>
-</section>
+<section class="hero-row"><div><p class="eyebrow">PERSÖNLICHE FINANZEN / ÜBERSICHT</p><h1>Deine Ausgaben<br><em>im Überblick.</em></h1></div><a class="text-link" href="{{ url_for('logout') }}">Abmelden</a></section>
 <section class="entry-card">
-  <div class="section-kicker">
-    <span>01 / NEUER EINTRAG</span><span>KOSTEN + BESCHREIBUNG</span>
-  </div>
+  <div class="section-kicker"><span>01 / NEUER EINTRAG</span><span>BETRAG + BESCHREIBUNG</span></div>
   <form action="{{ url_for('add_expense_view') }}" method="post" class="entry-form">
-    <label class="visually-hidden" for="expense">
-      Kosten und Beschreibung
-    </label>
-    <input id="expense" name="expense" placeholder="12.50 Market" autocomplete="off" required>
-    <button type="submit">hinzufügen</button>
+    <label class="visually-hidden" for="expense">Betrag und Beschreibung</label>
+    <input id="expense" name="expense" placeholder="12,50 Supermarkt" autocomplete="off" required>
+    <button type="submit">Ausgabe hinzufügen</button>
   </form>
-  <p class="hint">Besipiele: 12.50 Essen · 2,90 parken</p>
+  <p class="hint">Beispiele: 12,50 Supermarkt · 8,90 € Monatskarte</p>
 </section>
 <section class="ledger-section">
-  <div class="ledger-heading">
-    <div>
-      <p class="eyebrow">02 / AKTIVITÄT</p>
-      <h2>Monatliche Einträge</h2>
-    </div><span class="count">{{ expenses|length }} EINTRÄGE</span>
-  </div>
-  <form class="month-filter" action="{{ url_for('index') }}" method="get">
-    <label for="month">Reporting month</label>
-    <input id="month" name="month" type="month" value="{{ selected_month }}">
-      <button class="button-quiet" type="submit">
-        Monat
-      </button>
-      <strong>EURO {{ '%.2f'|format(total) }}</strong>
-    </form>
-  {% if expenses %}
-    <div class="ledger-list">
-      {% for expense in expenses %}
-        <article class="ledger-item">
-          <div class="date-mark">{{ expense['expense_date'][5:] }}</div>
-          <div class="expense-copy">
-            <strong>{{ expense['description'] }}</strong>
-            <span>{{ expense['category'] }} · {{ expense['user_name'] }}</span>
-          </div>
-          <div class="expense-value">EUR {{ '%.2f'|format(expense['amount']) }}</div>
-        </article>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p class="empty-state">Keine Eintragung diesen Monat. Dein erster Eintrag beginnt die Liste.</p>
-  {% endif %}
+  <div class="ledger-heading"><div><p class="eyebrow">02 / AKTIVITÄTEN</p><h2>Einträge im Monat</h2></div><span class="count">{{ expenses|length }} EINTRÄGE</span></div>
+  <form class="month-filter" action="{{ url_for('index') }}" method="get"><label for="month">Berichtsmonat</label><input id="month" name="month" type="month" value="{{ selected_month }}"><button class="button-quiet" type="submit">Monat anzeigen</button><strong>{{ ('%.2f'|format(total)).replace('.', ',') }} €</strong></form>
+  {% if expenses %}<div class="ledger-list">
+    {% for expense in expenses %}<article class="ledger-item"><div class="date-mark">{{ expense['expense_date'][5:] }}</div><div class="expense-copy"><strong>{{ expense['description'] }}</strong><span>{{ 'Sonstiges' if expense['category'] == 'Other' else expense['category'] }} · {{ expense['user_name'] }}</span></div><div class="expense-value">{{ ('%.2f'|format(expense['amount'])).replace('.', ',') }} €</div></article>{% endfor %}
+  </div>{% else %}<p class="empty-state">Für diesen Monat gibt es noch keine Einträge. Erfasse deine erste Ausgabe.</p>{% endif %}
 </section>
-<section class="actions-row">
-  <form action="{{ url_for('delete_latest_view') }}" method="post">
-    <button class="button-quiet" type="submit">
-      letzter Eintrag löschen
-    </button>
-  </form>
-  <form action="{{ url_for('mail_report') }}" method="post">
-    <input type="hidden" name="month" value="{{ selected_month }}">
-      <button class="button-quiet" type="submit">
-        Email Bericht senden
-      </button>
-    </form>
-</section>
+<section class="actions-row"><form action="{{ url_for('delete_latest_view') }}" method="post"><button class="button-quiet" type="submit">Meinen letzten Eintrag löschen</button></form><form action="{{ url_for('mail_report') }}" method="post"><input type="hidden" name="month" value="{{ selected_month }}"><button class="button-quiet" type="submit">Bericht für diesen Monat per E-Mail senden</button></form></section>
 {% endblock %}

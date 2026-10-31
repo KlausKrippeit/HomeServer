@@ -14,7 +14,7 @@ Kleine, selbst betriebene Ausgabenliste mit Flask und SQLite. Die Oberfläche pa
 6. Symbole erzeugen: `python gen-icons.py`.
 7. Lokal starten: `python web.py`. Die Standardadresse ist `http://127.0.0.1:8080`.
 
-Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `EUR 8.90 Bus pass` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird anhand passender Stichwörter in der Beschreibung erkannt. Standardzuordnungen sind in `config.py` hinterlegt; unbekannte Stichwörter erhalten die Ersatzkategorie `Other`. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
+Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `8,90 EUR Monatskarte` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird anhand passender Stichwörter in der Beschreibung erkannt. Standardzuordnungen sind in `config.py` hinterlegt; unbekannte Stichwörter erhalten intern die Ersatzkategorie `Other`, die in der Oberfläche als „Sonstiges“ angezeigt wird. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
 
 ## Monatsübersicht und E-Mail-Bericht
 
@@ -49,7 +49,7 @@ Die Web-App muss über HTTPS erreichbar sein, damit iOS den Service Worker zuver
 
 ## Konfiguration
 
-Die Einstellungen werden mit `os.getenv` aus `.env` gelesen. `CATEGORIES` akzeptiert kommaseparierte Zuordnungen im Format `stichwort=Kategorie`, zum Beispiel `markt=Lebensmittel,apotheke=Drogerie`. Diese Einträge ergänzen die Standardzuordnungen oder überschreiben ein vorhandenes Stichwort, etwa `rewe=Einkauf`. Die Stichwörter werden ohne Beachtung der Groß-/Kleinschreibung gesucht. Unbekannte Stichwörter erhalten `Other`. Die übrigen Einstellungen sind `USERS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` und `MAIL_TO`.
+Die Einstellungen werden mit `os.getenv` aus `.env` gelesen. `CATEGORIES` akzeptiert kommaseparierte Zuordnungen im Format `stichwort=Kategorie`, zum Beispiel `markt=Lebensmittel,apotheke=Drogerie`. Diese Einträge ergänzen die Standardzuordnungen oder überschreiben ein vorhandenes Stichwort, etwa `rewe=Einkauf`. Die Stichwörter werden ohne Beachtung der Groß-/Kleinschreibung gesucht. Unbekannte Stichwörter erhalten intern `Other` und werden als „Sonstiges“ angezeigt. Die übrigen Einstellungen sind `USERS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` und `MAIL_TO`.
 
 ## Hinweis zu Dateinamen
 

@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}Login · Expenses{% endblock %}
+{% block title %}Anmelden · Ausgaben{% endblock %}
 {% block content %}
 <section class="login-panel">
-  <p class="eyebrow">PERSÖNLICHE AUSGABEN / 01</p>
-  <h1>Ausgaben im Blick behalten<br><em>behalten.</em></h1>
-  <p class="intro">Login um deine Ausgaben einzutragen und kontrollieren.</p>
+  <p class="eyebrow">PERSÖNLICHE FINANZEN / 01</p>
+  <h1>Behalte deine Ausgaben<br><em>im Blick.</em></h1>
+  <p class="intro">Melde dich an, um deine Ausgaben zu erfassen, anzusehen und auszuwerten.</p>
   <form action="{{ url_for('login_post') }}" method="post" class="stack-form">
-    <label for="user_name">Username</label><input id="user_name" name="user_name" autocomplete="username" required>
+    <label for="user_name">Benutzername</label><input id="user_name" name="user_name" autocomplete="username" required>
     <label for="password">Passwort</label><input id="password" name="password" type="password" autocomplete="current-password" required>
-    <button type="submit">Login</button>
+    <button type="submit">Anmelden</button>
   </form>
 </section>
 {% endblock %}
