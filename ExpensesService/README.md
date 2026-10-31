@@ -8,17 +8,23 @@ Kleine, selbst betriebene Ausgabenliste mit Flask und SQLite. Die Oberfläche pa
 2. Eine virtuelle Umgebung anlegen und aktivieren:
    - Linux/macOS: `python3 -m venv venv` und `source venv/bin/activate`
    - Windows: `py -m venv venv` und `venv\Scripts\activate`
-3. Abhängigkeiten installieren: `pip install -r requirements.txt`.
+3. Abhängigkeiten installieren: `pip install -r requirements.txt` (Flask, python-dotenv, waitress und Pillow).
 4. Konfiguration kopieren: `cp .env.example .env` (Windows: `copy .env.example .env`).
 5. In `.env` mindestens `SECRET_KEY` und `USERS` ändern. Nutzer werden als `name:kennwort` eingetragen; mehrere Nutzer werden mit Kommas getrennt. Außerdem können Kategorie-Stichwörter, Datenbankpfad, Bind-Adresse und E-Mail-Versand eingestellt werden.
 6. Symbole erzeugen: `python gen-icons.py`.
-7. Lokal starten: `python web.py`. Die Standardadresse ist `http://127.0.0.1:8080`.
+7. Lokal starten: `python web.py`. Der Dienst läuft mit dem Produktionsserver waitress. Die Standardadresse ist `http://127.0.0.1:8080`; sie lässt sich mit `BIND_HOST` und `BIND_PORT` ändern.
 
-Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `48,90 EUR Monatskarte` eingegeben werden. Beträge müssen positiv sein. Die Kategorie wird anhand passender Stichwörter in der Beschreibung erkannt. Standardzuordnungen sind in `config.py` hinterlegt; unbekannte Stichwörter erhalten intern die Ersatzkategorie `Other`, die in der Oberfläche als „Sonstiges“ angezeigt wird. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
+Ausgabeneinträge können beispielsweise als `12,50 Rewe` oder `48,90 EUR Monatskarte` eingegeben werden. Beträge müssen größer als null sein und dürfen 10.000.000 nicht überschreiten. Die Kategorie wird anhand passender Stichwörter in der Beschreibung erkannt. Standardzuordnungen sind in `config.py` hinterlegt; unbekannte Stichwörter erhalten intern die Ersatzkategorie `Other`, die in der Oberfläche als „Sonstiges“ angezeigt wird. Die Datenbanktabelle wird beim Zugriff angelegt. Es gibt absichtlich keine Datenbankmigration; eine vorhandene Datenbank mit einem älteren Schema muss vor dem Start gesichert und entfernt oder manuell angepasst werden.
+
+## Anmeldung und Bedienung
+
+Alle Seiten außer der Anmeldung sind nur nach dem Login erreichbar. Die Zugangsdaten stammen aus `USERS`; die Kennwörter werden beim Start gehasht im Speicher gehalten. Eine Sitzung bleibt 30 Tage gültig, das Session-Cookie ist `HttpOnly` und `SameSite=Lax`. Alle schreibenden Anfragen (Anmelden, Ausgabe hinzufügen, Löschen, Bericht senden) werden mit einem CSRF-Token geschützt.
+
+Jeder Nutzer sieht in der Übersicht nur seine eigenen Einträge. Mit „Meinen letzten Eintrag löschen“ wird der jüngste Eintrag des angemeldeten Nutzers entfernt; Einträge anderer Nutzer sind davon nicht betroffen.
 
 ## Monatsübersicht und E-Mail-Bericht
 
-Die Monatsauswahl auf der Startseite filtert die angezeigten Einträge. Die Schaltfläche zum Versenden erstellt den Bericht für den ausgewählten Monat. Dafür müssen `SMTP_HOST`, `MAIL_FROM` und `MAIL_TO` konfiguriert sein. Der Versand verwendet STARTTLS; `SMTP_USER` und `SMTP_PASS` sind optional.
+Die Monatsauswahl auf der Startseite filtert die angezeigten Einträge des angemeldeten Nutzers und zeigt deren Summe an. Die Schaltfläche zum Versenden erstellt den Bericht für den ausgewählten Monat. Dafür müssen `SMTP_HOST`, `MAIL_FROM` und `MAIL_TO` konfiguriert sein. Der Versand verwendet STARTTLS; `SMTP_USER` und `SMTP_PASS` sind optional.
 
 Das Skript `monthly-mail.py` versendet den Bericht des laufenden Monats ausschließlich, wenn es am letzten Kalendertag des Monats gestartet wird. Beispiel für einen täglichen Cron-Aufruf (Pfade anpassen):
 
@@ -41,7 +47,7 @@ Die systemd-Datei lädt `.env`; der Start über `python web.py` berücksichtigt 
 
 ## Installation auf dem iPhone
 
-Die Web-App muss über HTTPS erreichbar sein, damit iOS den Service Worker zuverlässig verwenden kann. In Safari die Seite öffnen, die Teilen-Taste wählen und „Zum Home-Bildschirm“ antippen. Das Manifest sowie `apple-touch-icon` und die weiteren PWA-Bilddateien werden vom Projekt bereitgestellt.
+Die Web-App muss über HTTPS erreichbar sein, damit iOS den Service Worker zuverlässig verwenden kann. In Safari die Seite öffnen, die Teilen-Taste wählen und „Zum Home-Bildschirm“ antippen. Das Manifest sowie `apple-touch-icon` und die weiteren PWA-Bilddateien werden vom Projekt bereitgestellt. Der Service Worker (`/sw.js`) legt nur statische Dateien unter `/static/` (Stylesheet, Manifest, Symbole) im Cache ab. Die Seiten selbst werden immer vom Server geladen, ein Offline-Betrieb ist daher nicht möglich.
 
 ## Sicherheit
 
@@ -50,6 +56,18 @@ Die Web-App muss über HTTPS erreichbar sein, damit iOS den Service Worker zuver
 ## Konfiguration
 
 Die Einstellungen werden mit `os.getenv` aus `.env` gelesen. `CATEGORIES` akzeptiert kommaseparierte Zuordnungen im Format `stichwort=Kategorie`, zum Beispiel `markt=Lebensmittel,apotheke=Drogerie`. Diese Einträge ergänzen die Standardzuordnungen oder überschreiben ein vorhandenes Stichwort, etwa `rewe=Einkauf`. Die Stichwörter werden ohne Beachtung der Groß-/Kleinschreibung gesucht. Unbekannte Stichwörter erhalten intern `Other` und werden als „Sonstiges“ angezeigt. Die übrigen Einstellungen sind `USERS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` und `MAIL_TO`.
+
+Standardwerte, falls eine Variable fehlt:
+
+| Variable | Standard |
+| --- | --- |
+| `USERS` | leer (dann ist keine Anmeldung möglich) |
+| `SECRET_KEY` | `development-only-change-this-secret` (nur für die Entwicklung, unbedingt ändern) |
+| `DB_PATH` | `expenses.db` im Arbeitsverzeichnis |
+| `BIND_HOST` | `127.0.0.1` |
+| `BIND_PORT` | `8080` |
+| `SMTP_PORT` | `587` |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `MAIL_TO` | leer |
 
 ## Hinweis zu Dateinamen
 

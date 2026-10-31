@@ -1,3 +1,4 @@
+import secrets
 from datetime import date, timedelta
 from functools import wraps
 
@@ -12,6 +13,37 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY
 app.permanent_session_lifetime = timedelta(days=30)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax')
+
+
+def get_csrf_token():
+    """Liefert das CSRF-Token der Sitzung und erzeugt es bei Bedarf."""
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_urlsafe(32)
+    return session['_csrf_token']
+
+
+app.jinja_env.globals['csrf_token'] = get_csrf_token
+
+
+@app.before_request
+def protect_against_csrf():
+    """Lehnt schreibende Anfragen ohne gültiges CSRF-Token ab."""
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        return None
+    expected_token = session.get('_csrf_token', '')
+    submitted_token = (
+        request.form.get('csrf_token', '')
+        or request.headers.get('X-CSRF-Token', '')
+    )
+    if expected_token and secrets.compare_digest(
+        expected_token.encode('utf-8'), submitted_token.encode('utf-8')
+    ):
+        return None
+    app.logger.warning('CSRF-Prüfung fehlgeschlagen für %s', request.path)
+    message = 'Die Sitzung ist abgelaufen oder ungültig. Bitte erneut versuchen.'
+    if 'user_name' in session:
+        return redirect(url_for('index', message=message))
+    return redirect(url_for('login', message=message))
 
 
 def login_required(view_function):

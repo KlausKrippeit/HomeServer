@@ -14,8 +14,9 @@
     <span>01 / NEUER EINTRAG</span><span>BETRAG + BESCHREIBUNG</span>
   </div>
   <form action="{{ url_for('add_expense_view') }}" method="post" class="entry-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label class="visually-hidden" for="expense">Betrag und Beschreibung</label>
-    <input id="expense" name="expense" placeholder="12,50 Supermarkt" autocomplete="off" required>
+    <input id="expense" name="expense" placeholder="8,50 Döner" autocomplete="off" required>
     <button type="submit">Ausgabe hinzufügen</button>
   </form>
   <p class="hint">Beispiele: 12,50 Supermarkt · 48,90 € Monatskarte</p>
@@ -55,11 +56,14 @@
 </section>
 <section class="actions-row">
   <form action="{{ url_for('delete_latest_view') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button class="button-quiet" type="submit">Meinen letzten Eintrag löschen</button>
   </form>
   <form action="{{ url_for('mail_report') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="month" value="{{ selected_month }}">
     <button class="button-quiet" type="submit">Bericht für diesen Monat per E-Mail senden</button>
   </form>
 </section>
 {% endblock %}
+
