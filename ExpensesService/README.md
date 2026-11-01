@@ -10,7 +10,7 @@ Kleine, selbst betriebene Ausgabenliste mit Flask und SQLite. Die Oberfläche pa
    - Windows: `py -m venv venv` und `venv\Scripts\activate`
 3. Abhängigkeiten installieren: `pip install -r requirements.txt` (Flask, python-dotenv, waitress und Pillow).
 4. Konfiguration kopieren: `cp .env.example .env` (Windows: `copy .env.example .env`).
-5. In `.env` mindestens `SECRET_KEY` und `USERS` ändern. Nutzer werden als `name:kennwort` eingetragen; mehrere Nutzer werden mit Kommas getrennt. Außerdem können Kategorie-Stichwörter, Datenbankpfad, Bind-Adresse und E-Mail-Versand eingestellt werden.
+5. In `.env` mindestens `SECRET_KEY` und `USERS` ändern (siehe zusätzlich „Bearer-Token und API“). Nutzer werden als `name:kennwort` eingetragen; mehrere Nutzer werden mit Kommas getrennt. Außerdem können Kategorie-Stichwörter, Datenbankpfad, Bind-Adresse und E-Mail-Versand eingestellt werden.
 6. Symbole erzeugen: `python gen-icons.py`.
 7. Lokal starten: `python web.py`. Der Dienst läuft mit dem Produktionsserver waitress. Die Standardadresse ist `http://127.0.0.1:8080`; sie lässt sich mit `BIND_HOST` und `BIND_PORT` ändern.
 
@@ -55,14 +55,15 @@ Die Web-App muss über HTTPS erreichbar sein, damit iOS den Service Worker zuver
 
 ## Konfiguration
 
-Die Einstellungen werden mit `os.getenv` aus `.env` gelesen. `CATEGORIES` akzeptiert kommaseparierte Zuordnungen im Format `stichwort=Kategorie`, zum Beispiel `markt=Lebensmittel,apotheke=Drogerie`. Diese Einträge ergänzen die Standardzuordnungen oder überschreiben ein vorhandenes Stichwort, etwa `rewe=Einkauf`. Die Stichwörter werden ohne Beachtung der Groß-/Kleinschreibung gesucht. Unbekannte Stichwörter erhalten intern `Other` und werden als „Sonstiges“ angezeigt. Die übrigen Einstellungen sind `USERS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` und `MAIL_TO`.
+Die Einstellungen werden mit `os.getenv` aus `.env` gelesen. `CATEGORIES` akzeptiert kommaseparierte Zuordnungen im Format `stichwort=Kategorie`, zum Beispiel `markt=Lebensmittel,apotheke=Drogerie`. Diese Einträge ergänzen die Standardzuordnungen oder überschreiben ein vorhandenes Stichwort, etwa `rewe=Einkauf`. Die Stichwörter werden ohne Beachtung der Groß-/Kleinschreibung gesucht. Unbekannte Stichwörter erhalten intern `Other` und werden als „Sonstiges“ angezeigt. Die Einstellungen umfassen `USERS`, `API_TOKENS`, `SECRET_KEY`, `DB_PATH`, `BIND_HOST`, `BIND_PORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` und `MAIL_TO`.
 
 Standardwerte, falls eine Variable fehlt:
 
 | Variable | Standard |
 | --- | --- |
-| `USERS` | leer (dann ist keine Anmeldung möglich) |
-| `SECRET_KEY` | `development-only-change-this-secret` (nur für die Entwicklung, unbedingt ändern) |
+| `USERS` | leer (dann ist keine Anmeldung und Tokenzuordnung möglich) |
+| `API_TOKENS` | leer (GET-API bleibt nicht authentifiziert unzugänglich) |
+| `SECRET_KEY` | erforderlich; Dienst startet ohne gesetzten Wert nicht |
 | `DB_PATH` | `expenses.db` im Arbeitsverzeichnis |
 | `BIND_HOST` | `127.0.0.1` |
 | `BIND_PORT` | `8080` |
@@ -72,3 +73,47 @@ Standardwerte, falls eine Variable fehlt:
 ## Hinweis zu Dateinamen
 
 `monthly-mail.py` und `gen-icons.py` enthalten Bindestriche. Sie werden als Skripte gestartet, nicht als Python-Module importiert. Die importierten Module haben Dateinamen ohne Bindestriche: `config.py`, `db.py`, `report.py` und `web.py`.
+
+## Theme wechseln
+
+Oben rechts schaltet **DARK MODE** zwischen dem bestehenden hellen Design und dem dunklen Comic-inspirierten Design um. Die Auswahl wird lokal im Browser gespeichert. Es werden keine Comic-Sans-Schriften verwendet.
+
+## Bearer-Token und API
+
+Die Browser-GUI bleibt mit dem konfigurierten `USERS`-Benutzername/Kennwort und einer sicheren Sitzung geschützt. Zusätzlich akzeptiert sie für geschützte Ansichten `Authorization: Bearer <token>`. Externe Apps können dieselbe Token-Authentifizierung für schreibgeschützte GET-API-Aufrufe verwenden.
+
+1. `.env` aus `.env.example` erstellen und `SECRET_KEY` durch einen eigenen, zufälligen Wert ersetzen:
+   ```sh
+   python -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+2. Ein starkes, separates API-Token generieren:
+   ```sh
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+3. In der nur für den Dienstbenutzer lesbaren `.env` konfigurieren. `API_TOKENS` ordnet Token den vorhandenen `USERS` zu. Beispiel (Werte ersetzen, nicht veröffentlichen):
+   ```dotenv
+   USERS=Anna:<starkes-login-passwort>
+   SECRET_KEY=<zufälliger-secret-key>
+   API_TOKENS=Anna:<zufälliges-bearer-token>
+   ```
+   Mehrere Zuweisungen sind kommasepariert: `API_TOKENS=Anna:<token-a>,Ben:<token-b>`. Ein Token für einen nicht in `USERS` definierten Nutzernamen wird ignoriert. Token und `.env` niemals in Versionsverwaltung oder Logs ablegen. Der Server startet nicht, wenn `SECRET_KEY` fehlt.
+4. Start wie oben: `python web.py` (nach Installation der Abhängigkeiten und Aktivierung der virtuellen Umgebung). Lokal erreichbar unter `http://127.0.0.1:8080`; für externe Apps im Netz `BIND_HOST` passend setzen und ausschließlich über HTTPS bzw. einen abgesicherten Reverse-Proxy übertragen.
+
+### GET-Endpunkte
+
+Alle API-Antworten sind JSON. Fehlender oder ungültiger Bearer-Token ergibt an den API-Endpunkten HTTP `401`; ein falsch formatiertes `month` ergibt HTTP `400`.
+
+| Methode und Pfad | Zweck |
+| --- | --- |
+| `GET /api/expenses` | Einträge und Summe des aktuellen Monats für den Token-Nutzer. Optional `?month=YYYY-MM`. |
+| `GET /api/expenses/latest` | Bis zu 25 jüngste Einträge des Token-Nutzers. |
+
+Beispielaufrufe (Token aus sicherer Konfiguration einsetzen):
+
+```sh
+curl -H "Authorization: Bearer $API_TOKEN" http://127.0.0.1:8080/api/expenses
+curl -H "Authorization: Bearer $API_TOKEN" 'http://127.0.0.1:8080/api/expenses?month=2026-10'
+curl -H "Authorization: Bearer $API_TOKEN" http://127.0.0.1:8080/api/expenses/latest
+```
+
+Die erste Route liefert `{user, month, total, expenses}`; die letzte `{user, expenses}`. Beide scopen Daten ausschließlich auf den Nutzer des Tokens. Die API bietet bewusst nur GET-Lesezugriff, keine Token-Ausgabe, Token-Rotation oder Schreiboperationen. Browser-Formulare verwenden weiterhin Sitzungs-Cookies und CSRF-Schutz.

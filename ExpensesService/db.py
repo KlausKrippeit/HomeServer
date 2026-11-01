@@ -75,13 +75,20 @@ def add_expense(user_name, raw_input, expense_date=None):
         return cursor.lastrowid
 
 
-def get_latest(limit=25):
-    """Liefert die jüngsten Einträge unabhängig vom Monat."""
+def get_latest(limit=25, user_name=None):
+    """Liefert jüngste Einträge; optional auf einen Nutzer beschränkt."""
     with get_connection() as connection:
+        if user_name is None:
+            return connection.execute(
+                'SELECT id, expense_date, user_name, amount, description, category '
+                'FROM expenses ORDER BY expense_date DESC, id DESC LIMIT ?',
+                (limit,),
+            ).fetchall()
         return connection.execute(
             'SELECT id, expense_date, user_name, amount, description, category '
-            'FROM expenses ORDER BY expense_date DESC, id DESC LIMIT ?',
-            (limit,),
+            'FROM expenses WHERE user_name = ? '
+            'ORDER BY expense_date DESC, id DESC LIMIT ?',
+            (user_name, limit),
         ).fetchall()
 
 

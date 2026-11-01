@@ -463,3 +463,79 @@ button {
     margin-left: auto;
   }
 }
+
+/* Persisted optional dark comic-book theme; lettering stays in the existing sans/mono fonts. */
+.masthead-tools { display: flex; align-items: center; gap: 14px; }
+.theme-toggle {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font: 10px var(--mono);
+  letter-spacing: .06em;
+}
+.theme-toggle:hover { border-color: var(--blue); color: var(--blue); }
+
+html[data-theme="comic"] {
+  color-scheme: dark;
+  --ink: #f5f1e8;
+  --muted: #bcb6a8;
+  --blue: #ffce3a;
+  --paper: #171923;
+  --line: #f5f1e8;
+  --white: #252938;
+}
+html[data-theme="comic"] body {
+  background-color: var(--paper);
+  background-image: radial-gradient(#ffffff12 .8px, transparent .8px);
+  background-size: 9px 9px;
+}
+html[data-theme="comic"] .masthead,
+html[data-theme="comic"] .page-footer,
+html[data-theme="comic"] .ledger-list,
+html[data-theme="comic"] .ledger-item,
+html[data-theme="comic"] .month-filter,
+html[data-theme="comic"] .empty-state { border-color: var(--line); }
+html[data-theme="comic"] .entry-card {
+  border: 2px solid var(--line);
+  box-shadow: 6px 6px 0 var(--blue);
+}
+html[data-theme="comic"] .stack-form input,
+html[data-theme="comic"] .entry-form input,
+html[data-theme="comic"] .month-filter input {
+  border: 2px solid var(--line);
+  background: #171923;
+  color: var(--ink);
+}
+html[data-theme="comic"] .stack-form button,
+html[data-theme="comic"] .entry-form button {
+  background: var(--blue);
+  color: #171923;
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+html[data-theme="comic"] .button-quiet,
+html[data-theme="comic"] .theme-toggle {
+  border-width: 2px;
+  border-color: var(--line);
+  color: var(--ink);
+}
+html[data-theme="comic"] .button-quiet:hover,
+html[data-theme="comic"] .theme-toggle:hover { color: var(--blue); border-color: var(--blue); }
+html[data-theme="comic"] .notice {
+  background: #3c3140;
+  color: #fff0c2;
+  border-left-color: var(--blue);
+}
+html[data-theme="comic"] h1 em {
+  color: var(--blue);
+  text-shadow: 2px 2px 0 #e24e57;
+}
+
+@media (max-width: 620px) {
+  .masthead-tools { gap: 8px; }
+  .account { font-size: 9px; }
+  .theme-toggle { padding: 0 8px; font-size: 9px; }
+}

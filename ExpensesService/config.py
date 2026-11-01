@@ -20,6 +20,20 @@ def parse_users(raw_users):
     return users
 
 
+
+
+def parse_api_tokens(raw_tokens, users):
+    """Liest Nutzer:Token-Paare; Tokens gehören nur konfigurierten Nutzern."""
+    tokens = {}
+    for entry in raw_tokens.split(','):
+        if ':' not in entry:
+            continue
+        user_name, token = (part.strip() for part in entry.split(':', 1))
+        if user_name in users and token:
+            tokens[token] = user_name
+    return tokens
+
+
 def parse_category_map(raw_categories, defaults=None):
     """Ergänzt Standardzuordnungen mit Einträgen aus der Umgebung."""
     category_map = dict(defaults or {})
@@ -33,7 +47,8 @@ def parse_category_map(raw_categories, defaults=None):
 
 
 USERS = parse_users(os.getenv('USERS', ''))
-SECRET_KEY = os.getenv('SECRET_KEY', 'development-only-change-this-secret')
+API_TOKENS = parse_api_tokens(os.getenv('API_TOKENS', ''), USERS)
+SECRET_KEY = os.getenv('SECRET_KEY', '')
 DB_PATH = os.getenv('DB_PATH', 'expenses.db')
 BIND_HOST = os.getenv('BIND_HOST', '127.0.0.1')
 BIND_PORT = int(os.getenv('BIND_PORT', '8080'))

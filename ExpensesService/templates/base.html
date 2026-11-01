@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <title>{% block title %}Ausgaben{% endblock %}</title>
   <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem('expenses-theme') || 'light'; } catch (_) {}
     if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register("{{ url_for('service_worker') }}")); }
   </script>
 </head>
@@ -22,11 +23,10 @@
       <a class="wordmark" href="{{ url_for('index') if session.get('user_name') else url_for('login') }}">
         AUSGABEN <span>/</span> ÜBERSICHT
       </a>
-        {% if session.get('user_name') %}
-          <span class="account">
-            {{ session.get( 'user_name' ) }}
-          </span>
-        {% endif %}
+      <div class="masthead-tools">
+        {% if session.get('user_name') %}<span class="account">{{ session.get('user_name') }}</span>{% endif %}
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false">DARK MODE</button>
+      </div>
     </header>
 
     {% if message %}
@@ -36,6 +36,20 @@
     {% block content %}{% endblock %}
 
     <footer class="page-footer">Jede Ausgabe klar im Blick.</footer>
+    <script>
+      const themeButton = document.getElementById('theme-toggle');
+      const applyTheme = theme => {
+        document.documentElement.dataset.theme = theme;
+        themeButton.setAttribute('aria-pressed', String(theme === 'comic'));
+        themeButton.textContent = theme === 'comic' ? 'HELL / STANDARD' : 'DARK MODE';
+      };
+      applyTheme(document.documentElement.dataset.theme || 'light');
+      themeButton.addEventListener('click', () => {
+        const next = document.documentElement.dataset.theme === 'comic' ? 'light' : 'comic';
+        applyTheme(next);
+        try { localStorage.setItem('expenses-theme', next); } catch (_) {}
+      });
+    </script>
   </main>
 </body>
 </html>

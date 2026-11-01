@@ -1,15 +1,18 @@
 import secrets
 from datetime import date, timedelta
+from flask import jsonify, g
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from config import BIND_HOST, BIND_PORT, SECRET_KEY, USERS
+from config import API_TOKENS, BIND_HOST, BIND_PORT, SECRET_KEY, USERS
 from db import add_expense, delete_latest, get_month
 from report import send_mail
 
 app = Flask(__name__)
+if not SECRET_KEY:
+    raise RuntimeError('SECRET_KEY muss als Umgebungsvariable oder in .env gesetzt sein.')
 app.secret_key = SECRET_KEY
 app.permanent_session_lifetime = timedelta(days=30)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax')
@@ -23,6 +26,29 @@ def get_csrf_token():
 
 
 app.jinja_env.globals['csrf_token'] = get_csrf_token
+
+
+@app.before_request
+def authenticate_bearer_token():
+    """Setzt den Nutzer aus einem gültigen Authorization: Bearer-Header."""
+    g.auth_user = None
+    authorization = request.headers.get('Authorization', '')
+    if not authorization.startswith('Bearer '):
+        return None
+    supplied = authorization[7:].strip()
+    matched_user = None
+    # Constant-time Vergleich mit jedem konfigurierten Token statt direktem Lookup.
+    for configured_token, user_name in API_TOKENS.items():
+        if secrets.compare_digest(supplied.encode('utf-8'), configured_token.encode('utf-8')):
+            matched_user = user_name
+    if matched_user is None:
+        return jsonify(error='Invalid bearer token'), 401
+    g.auth_user = matched_user
+
+
+def current_user():
+    """Liefert den Nutzer aus Bearer-Token oder Browser-Sitzung."""
+    return getattr(g, 'auth_user', None) or session.get('user_name')
 
 
 @app.before_request
@@ -50,7 +76,9 @@ def login_required(view_function):
     """Schützt eine Ansicht vor Zugriffen ohne Anmeldung."""
     @wraps(view_function)
     def wrapped_view(*args, **kwargs):
-        if 'user_name' not in session:
+        if request.path.startswith('/api/') and not getattr(g, 'auth_user', None):
+            return jsonify(error='Bearer token required'), 401
+        if not current_user():
             return redirect(url_for('login'))
         return view_function(*args, **kwargs)
     return wrapped_view
@@ -98,7 +126,7 @@ def index():
         )
     except ValueError:
         selected_month = today.replace(day=1)
-    expenses = get_month(session['user_name'], selected_month.year, selected_month.month)
+    expenses = get_month(current_user(), selected_month.year, selected_month.month)
     total = sum(float(expense['amount']) for expense in expenses)
     return render_template(
         'index.html', expenses=expenses,
@@ -112,7 +140,7 @@ def index():
 def add_expense_view():
     """Speichert eine eingegebene Ausgabe."""
     try:
-        add_expense(session['user_name'], request.form.get('expense', ''))
+        add_expense(current_user(), request.form.get('expense', ''))
     except ValueError as error:
         return redirect(url_for('index', message=str(error)))
     return redirect(url_for('index', message='Ausgabe gespeichert.'))
@@ -122,7 +150,7 @@ def add_expense_view():
 @login_required
 def delete_latest_view():
     """Entfernt den jüngsten Eintrag des angemeldeten Nutzers."""
-    removed = delete_latest(session['user_name'])
+    removed = delete_latest(current_user())
     message = (
         'Letzter Eintrag gelöscht.' if removed
         else 'Es gibt keine Einträge zum Löschen.'
@@ -146,6 +174,36 @@ def mail_report():
         app.logger.exception('Der Ausgabenbericht konnte nicht gesendet werden')
         message = 'Der Bericht konnte nicht gesendet werden. Prüfe die E-Mail-Konfiguration.'
     return redirect(url_for('index', month=month_value, message=message))
+
+
+@app.get('/api/expenses')
+@login_required
+def api_expenses():
+    """Liefert authentifizierte Ausgaben des Nutzers, optional nach Monat gefiltert."""
+    month_value = request.args.get('month', '')
+    today = date.today()
+    try:
+        selected_month = (
+            date.fromisoformat(f'{month_value}-01') if month_value
+            else today.replace(day=1)
+        )
+    except ValueError:
+        return jsonify(error="Invalid month; expected YYYY-MM"), 400
+    expenses = get_month(current_user(), selected_month.year, selected_month.month)
+    return jsonify(
+        user=current_user(), month=selected_month.strftime('%Y-%m'),
+        total=round(sum(float(row['amount']) for row in expenses), 2),
+        expenses=[dict(row) for row in expenses],
+    )
+
+
+@app.get('/api/expenses/latest')
+@login_required
+def api_latest_expenses():
+    """Liefert die letzten 25 Einträge des authentifizierten Nutzers."""
+    from db import get_latest
+    rows = [dict(row) for row in get_latest(limit=25, user_name=current_user())]
+    return jsonify(user=current_user(), expenses=rows)
 
 
 @app.get('/favicon.ico')
