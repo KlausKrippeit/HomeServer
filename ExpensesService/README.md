@@ -29,12 +29,12 @@ Die Monatsauswahl auf der Startseite filtert die angezeigten Einträge des angem
 Das Skript `monthly-mail.py` versendet den Bericht des laufenden Monats ausschließlich, wenn es am letzten Kalendertag des Monats gestartet wird. Beispiel für einen täglichen Cron-Aufruf (Pfade anpassen):
 
 ```cron
-5 23 * * * /home/pi/ExpensesService/venv/bin/python /home/pi/ExpensesService/monthly-mail.py
+5 23 * * * /home/pi/scripts/ExpensesService/.venv/bin/python /home/pi/scripts/ExpensesService/monthly-mail.py
 ```
 
 ## systemd
 
-Die Beispieldatei `systemd/expenses-service.service` erwartet das Projekt unter `/home/pi/ExpensesService` sowie eine virtuelle Umgebung im Unterordner `venv`. Pfad und Benutzer `pi` müssen an das eigene System angepasst werden. Danach:
+Die Beispieldatei `systemd/expenses-service.service` erwartet das Projekt unter `/home/pi/scripts/ExpensesService` sowie eine virtuelle Umgebung im Unterordner `.venv`. Pfad und Benutzer `pi` müssen an das eigene System angepasst werden. Danach:
 
 ```sh
 sudo cp systemd/expenses-service.service /etc/systemd/system/
