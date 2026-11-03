@@ -10,12 +10,15 @@ Das Projekt ist eine kleine, selbst zu betreibende Flask-Anwendung mit plausible
 
 ## 1. Deploy und Konfiguration
 
-### P1 – systemd-Beispielpfade widersprechen der Betriebsanleitung
+### P1 – systemd-Beispielpfade widersprechen der Betriebsanleitung ✅ behoben
 
 - `systemd/expenses-service.service:7-10` setzt `User=pi`, `WorkingDirectory=/home/pi/scripts/ExpensesService`, lädt `/home/pi/scripts/ExpensesService/.env` und startet `.venv/bin/python`.
 - `README.md:37` sagt dagegen `/home/pi/ExpensesService` und eine Umgebung namens `venv`; auch das Cron-Beispiel in `README.md:32` verwendet `/home/pi/ExpensesService/venv`.
 - Folge: Wer die README-Kommandos unverändert befolgt, kann mit einem fehlenden Arbeitsverzeichnis, fehlender Environment-Datei oder nicht auffindbarem Python starten.
 - **Empfehlung:** Einen kanonischen Installationspfad, venv-Namen und dedizierten Dienstbenutzer festlegen; README, systemd-Datei und Cron-Pfad darauf abstimmen. Vor Aktivierung `systemd-analyze verify` sowie `systemctl status`/Journal prüfen. Eigentümer und Rechte des Projektverzeichnisses, der `.env` und des Datenbankverzeichnisses explizit setzen.
+
+**Lösung**
+Pfad  /home/pi/scripts/ExpensesService/.venv angepasst. README angepasst.
 
 ### P1 – `.env.example` Kategorienformat ist nicht kompatibel mit dem Parser
 
@@ -23,12 +26,15 @@ Das Projekt ist eine kleine, selbst zu betreibende Flask-Anwendung mit plausible
 - `config.py:37-46` verarbeitet jedoch ausschließlich Einträge im Format `stichwort=Kategorie`; Einträge ohne `=` werden stillschweigend ignoriert. Das Beispiel konfiguriert somit keine solche Kategorienliste, obwohl der Kommentar sie als Kategorien beschreibt. `README.md:58` beschreibt dagegen die Zuordnungsform `stichwort=Kategorie`.
 - **Empfehlung:** Klären, ob `CATEGORIES` eine Stichwort-Zuordnung oder eine Kategorienliste sein soll, und Beispiel/Kommentar/Dokumentation konsistent gestalten. Beim Start ungültige oder ignorierte Werte melden statt stillschweigend zu verwerfen.
 
-### P1 – E-Mail-Bericht kann die Datenbankfunktion nicht korrekt aufrufen
+### P1 – E-Mail-Bericht kann die Datenbankfunktion nicht korrekt aufrufen ✅ behoben
 
 - `db.py:112-127` definiert `get_month(user_name, year=None, month=None)` – der erste Parameter ist zwingend ein Nutzername.
 - `report.py:9-14` ruft `get_month(year, month)` auf. Damit wird das Jahr als Nutzername und der Monat als Jahr interpretiert; der Monat fällt auf den aktuellen Monat zurück. Das führt typischerweise zu einer leeren bzw. sachlich falschen Abfrage (Jahr im niedrigen Zahlenbereich) statt zum angeforderten Monatsbericht.
 - `report.py:18-22` deutet einen Bericht mit Nutzername und Ausgaben mehrerer Benutzer an; eine globale Abfrage ist in `db.py` aber nicht vorgesehen. Sowohl der manuelle Versand (`web.py:161-176`) als auch `monthly-mail.py:7-12` verwenden denselben Reportpfad.
 - **Empfehlung:** Vor Nutzung des Mailversands fachlich festlegen, ob ein Bericht je angemeldeter Person oder ein aggregierter Gesamtbericht gemeint ist. Schnittstelle und Datenzugriff explizit darauf ausrichten und mit Datensätzen von mindestens zwei Nutzern sowie historischem Monat testen. Bis dahin den Versand nicht als verlässlich ansehen.
+
+**Lösung**
+user_name an allen Funktionsaufrufen eingebaut, montly-mail mit parameter aufruf umgesetzt.
 
 ### P1 – Datenbankpfad, Backups und Wiederherstellung operationalisieren
 
