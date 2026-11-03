@@ -168,7 +168,7 @@ def mail_report():
             date.fromisoformat(f'{month_value}-01')
             if month_value else date.today()
         )
-        send_mail(selected_month.year, selected_month.month)
+        send_mail(current_user(), selected_month.year, selected_month.month)
         message = 'Monatsbericht wurde gesendet.'
     except Exception:
         app.logger.exception('Der Ausgabenbericht konnte nicht gesendet werden')
