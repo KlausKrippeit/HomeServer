@@ -33,7 +33,7 @@
     <label for="month">Berichtsmonat</label>
     <input id="month" name="month" type="month" value="{{ selected_month }}">
     <button class="button-quiet" type="submit">Monat anzeigen</button>
-    <strong>{{ ('%.2f'|format(total)).replace('.', ',') }} €</strong>
+    <strong>{{ total }}</strong>
   </form>
   {% if expenses %}
     <div class="ledger-list">
@@ -46,7 +46,7 @@
           <strong>{{ expense['description'] }}</strong>
           <span>{{ 'Sonstiges' if expense['category'] == 'Other' else expense['category'] }} · {{ expense['user_name'] }}</span>
         </div>
-        <div class="expense-value">{{ ('%.2f'|format(expense['amount'])).replace('.', ',') }} €</div>
+        <div class="expense-value">{{ expense['amount'] }}</div>
       </article>
     {% endfor %}
   </div>
@@ -66,4 +66,3 @@
   </form>
 </section>
 {% endblock %}
-

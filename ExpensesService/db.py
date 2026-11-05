@@ -1,15 +1,26 @@
 import re
 import sqlite3
 from datetime import date
-from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from config import CATEGORY_MAP, DB_PATH, DEFAULT_CATEGORY
+from money import MAX_CENTS, Money
 
 AMOUNT_PATTERN = re.compile(
     r'(?i)(?:(?:euro|eur\b|€)\s*)?(\d+(?:[.,]\d{1,2})?)'
     r'(?:\s*(?:euro|eur\b|€))?'
 )
+
+SCHEMA = (
+    'CREATE TABLE IF NOT EXISTS expenses ('
+    'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    "expense_date TEXT NOT NULL CHECK (expense_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'), "
+    'user_name TEXT NOT NULL, '
+    'amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0), '
+    'description TEXT NOT NULL, category TEXT NOT NULL)'
+)
+
+COLUMNS = 'id, expense_date, user_name, amount_cents, description, category'
 
 
 def get_connection():
@@ -19,12 +30,7 @@ def get_connection():
         database_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(database_path))
     connection.row_factory = sqlite3.Row
-    connection.execute(
-        'CREATE TABLE IF NOT EXISTS expenses ('
-        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
-        'expense_date TEXT NOT NULL, user_name TEXT NOT NULL, '
-        'amount REAL NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL)'
-    )
+    connection.execute(SCHEMA)
     return connection
 
 
@@ -38,16 +44,13 @@ def find_category(description):
 
 
 def parse_input(raw_input):
-    """Liest Betrag und Beschreibung aus einer Eingabezeile."""
+    """Liest Betrag (als Money) und Beschreibung aus einer Eingabezeile."""
     normalized_input = raw_input.strip()
     match = AMOUNT_PATTERN.search(normalized_input)
     if not match:
         raise ValueError('Gib einen Betrag mit anschließender Beschreibung ein.')
-    try:
-        amount = Decimal(match.group(1).replace(',', '.'))
-    except InvalidOperation as error:
-        raise ValueError('Gib einen gültigen Betrag ein.') from error
-    if amount <= 0 or amount > Decimal('10000000'):
+    amount = Money.from_string(match.group(1))
+    if amount.cents <= 0 or amount.cents > MAX_CENTS:
         raise ValueError(
             'Der Betrag muss größer als null sein und innerhalb des zulässigen Höchstbetrags liegen.'
         )
@@ -56,7 +59,7 @@ def parse_input(raw_input):
     ).strip(' ,.-')
     if not description:
         raise ValueError('Füge nach dem Betrag eine Beschreibung hinzu.')
-    return round(float(amount), 2), description, find_category(description)
+    return amount, description, find_category(description)
 
 
 def add_expense(user_name, raw_input, expense_date=None):
@@ -65,11 +68,11 @@ def add_expense(user_name, raw_input, expense_date=None):
     with get_connection() as connection:
         cursor = connection.execute(
             'INSERT INTO expenses '
-            '(expense_date, user_name, amount, description, category) '
+            '(expense_date, user_name, amount_cents, description, category) '
             'VALUES (?, ?, ?, ?, ?)',
             (
-                expense_date or date.today().isoformat(), user_name, amount,
-                description, category,
+                expense_date or date.today().isoformat(), user_name,
+                amount.cents, description, category,
             ),
         )
         return cursor.lastrowid
@@ -80,13 +83,12 @@ def get_latest(limit=25, user_name=None):
     with get_connection() as connection:
         if user_name is None:
             return connection.execute(
-                'SELECT id, expense_date, user_name, amount, description, category '
-                'FROM expenses ORDER BY expense_date DESC, id DESC LIMIT ?',
+                f'SELECT {COLUMNS} FROM expenses '
+                'ORDER BY expense_date DESC, id DESC LIMIT ?',
                 (limit,),
             ).fetchall()
         return connection.execute(
-            'SELECT id, expense_date, user_name, amount, description, category '
-            'FROM expenses WHERE user_name = ? '
+            f'SELECT {COLUMNS} FROM expenses WHERE user_name = ? '
             'ORDER BY expense_date DESC, id DESC LIMIT ?',
             (user_name, limit),
         ).fetchall()
@@ -120,9 +122,14 @@ def get_month(user_name, year=None, month=None):
     month_end = date(next_year, next_month, 1).isoformat()
     with get_connection() as connection:
         return connection.execute(
-            'SELECT id, expense_date, user_name, amount, description, category '
-            'FROM expenses WHERE user_name = ? '
+            f'SELECT {COLUMNS} FROM expenses WHERE user_name = ? '
             'AND expense_date >= ? AND expense_date < ? '
             'ORDER BY expense_date DESC, id DESC',
             (user_name, month_start, month_end),
         ).fetchall()
+
+
+def sum_month(rows):
+    """Einzige Stelle der Summenbildung über Datenbankzeilen."""
+    from money import total
+    return total(Money(row['amount_cents']) for row in rows)
