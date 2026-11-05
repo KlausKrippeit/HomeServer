@@ -7,7 +7,8 @@ from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from config import API_TOKENS, BIND_HOST, BIND_PORT, SECRET_KEY, USERS
-from db import add_expense, delete_latest, get_month
+from db import add_expense, delete_latest, get_latest, get_month, sum_month
+from money import Money
 from report import send_mail
 
 app = Flask(__name__)
@@ -26,6 +27,24 @@ def get_csrf_token():
 
 
 app.jinja_env.globals['csrf_token'] = get_csrf_token
+
+
+def expense_to_api(row):
+    """Serialisiert eine Zeile: amount als Dezimalzahl (kompatibel) plus amount_cents."""
+    return {
+        'id': row['id'], 'expense_date': row['expense_date'],
+        'user_name': row['user_name'],
+        'amount': float(Money(row['amount_cents']).to_decimal()),
+        'amount_cents': row['amount_cents'],
+        'description': row['description'], 'category': row['category'],
+    }
+
+
+def expense_to_view(row):
+    """Bereitet eine Zeile für das Template mit formatiertem Betrag auf."""
+    view = dict(row)
+    view['amount'] = str(Money(row['amount_cents']))
+    return view
 
 
 @app.before_request
@@ -127,10 +146,10 @@ def index():
     except ValueError:
         selected_month = today.replace(day=1)
     expenses = get_month(current_user(), selected_month.year, selected_month.month)
-    total = sum(float(expense['amount']) for expense in expenses)
     return render_template(
-        'index.html', expenses=expenses,
-        selected_month=selected_month.strftime('%Y-%m'), total=total,
+        'index.html', expenses=[expense_to_view(row) for row in expenses],
+        selected_month=selected_month.strftime('%Y-%m'),
+        total=sum_month(expenses),
         message=request.args.get('message', ''),
     )
 
@@ -190,10 +209,11 @@ def api_expenses():
     except ValueError:
         return jsonify(error="Invalid month; expected YYYY-MM"), 400
     expenses = get_month(current_user(), selected_month.year, selected_month.month)
+    month_total = sum_month(expenses)
     return jsonify(
         user=current_user(), month=selected_month.strftime('%Y-%m'),
-        total=round(sum(float(row['amount']) for row in expenses), 2),
-        expenses=[dict(row) for row in expenses],
+        total=float(month_total.to_decimal()), total_cents=month_total.cents,
+        expenses=[expense_to_api(row) for row in expenses],
     )
 
 
@@ -201,8 +221,7 @@ def api_expenses():
 @login_required
 def api_latest_expenses():
     """Liefert die letzten 25 Einträge des authentifizierten Nutzers."""
-    from db import get_latest
-    rows = [dict(row) for row in get_latest(limit=25, user_name=current_user())]
+    rows = [expense_to_api(row) for row in get_latest(limit=25, user_name=current_user())]
     return jsonify(user=current_user(), expenses=rows)
 
 
