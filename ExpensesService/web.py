@@ -1,6 +1,6 @@
 import secrets
 from datetime import date, timedelta
-from flask import jsonify, g
+from flask import jsonify, g, make_response
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
@@ -9,7 +9,7 @@ from werkzeug.security import check_password_hash
 from config import API_TOKENS, BIND_HOST, BIND_PORT, SECRET_KEY, USERS
 from db import add_expense, delete_latest, get_latest, get_month, sum_month
 from money import Money
-from report import send_mail
+from report import build_report
 
 app = Flask(__name__)
 if not SECRET_KEY:
@@ -177,22 +177,27 @@ def delete_latest_view():
     return redirect(url_for('index', message=message))
 
 
-@app.post('/mail-report')
+@app.post('/download-report')
 @login_required
-def mail_report():
-    """Versendet den Bericht des aktuell angezeigten Monats."""
+def download_report():
+    """Liefert den Monatsbericht als Textdatei zum Herunterladen."""
     month_value = request.form.get('month', '')
+    today = date.today()
     try:
         selected_month = (
             date.fromisoformat(f'{month_value}-01')
-            if month_value else date.today()
+            if month_value else today
         )
-        send_mail(current_user(), selected_month.year, selected_month.month)
-        message = 'Monatsbericht wurde gesendet.'
+        report_text = build_report(current_user(), selected_month.year, selected_month.month)
+        filename = f'ausgabenbericht_{selected_month.year}_{selected_month.month:02d}.txt'
+        response = make_response(report_text)
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+        return response
     except Exception:
-        app.logger.exception('Der Ausgabenbericht konnte nicht gesendet werden')
-        message = 'Der Bericht konnte nicht gesendet werden. Prüfe die E-Mail-Konfiguration.'
-    return redirect(url_for('index', month=month_value, message=message))
+        app.logger.exception('Der Bericht konnte nicht erstellt werden')
+        message = 'Der Bericht konnte nicht erstellt werden.'
+        return redirect(url_for('index', month=month_value, message=message))
 
 
 @app.get('/api/expenses')
