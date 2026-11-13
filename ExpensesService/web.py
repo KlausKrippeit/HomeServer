@@ -1,3 +1,4 @@
+import re
 import secrets
 from datetime import date, timedelta
 from flask import jsonify, g, make_response
@@ -7,7 +8,15 @@ from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from config import API_TOKENS, BIND_HOST, BIND_PORT, SECRET_KEY, USERS
-from db import add_expense, delete_latest, get_latest, get_month, sum_month
+from db import (
+    add_expense,
+    delete_latest,
+    get_latest,
+    get_month,
+    get_months_with_entries,
+    insert_expense,
+    sum_month,
+)
 from money import Money
 from report import build_report
 
@@ -70,6 +79,42 @@ def current_user():
     return getattr(g, 'auth_user', None) or session.get('user_name')
 
 
+MONTH_VALUE = re.compile(r'\d{4}-\d{2}')
+
+
+def parse_month(month_value):
+    """Parst 'YYYY-MM' zu (Jahr, Monat); ungültige Werte werfen ValueError."""
+    value = str(month_value or '').strip()
+    if not MONTH_VALUE.fullmatch(value):
+        raise ValueError('Invalid month; expected YYYY-MM')
+    parsed = date.fromisoformat(f'{value}-01')
+    return parsed.year, parsed.month
+
+
+def api_error(message, status):
+    """Liefert API-Fehler als JSON mit passendem HTTP-Statuscode."""
+    return jsonify(error=message), status
+
+
+def authenticate_user(user_name, password):
+    """Prüft Zugangsdaten gegen die konfigurierten Nutzer (gemeinsam für HTML und API)."""
+    if not user_name:
+        return False
+    password_hash = USERS.get(user_name)
+    return bool(password_hash and check_password_hash(password_hash, password))
+
+
+def json_login_required(view_function):
+    """Schützt JSON-Endpunkte; ohne Anmeldung wird 401 als JSON geliefert."""
+    @wraps(view_function)
+    def wrapped_view(*args, **kwargs):
+        if not current_user():
+            return api_error('Anmeldung erforderlich.', 401)
+        return view_function(*args, **kwargs)
+
+    return wrapped_view
+
+
 @app.before_request
 def protect_against_csrf():
     """Lehnt schreibende Anfragen ohne gültiges CSRF-Token ab."""
@@ -85,6 +130,12 @@ def protect_against_csrf():
     ):
         return None
     app.logger.warning('CSRF-Prüfung fehlgeschlagen für %s', request.path)
+    if request.path.startswith('/api/'):
+        message = (
+            'Ungültiges oder fehlendes CSRF-Token. Rufe zuerst GET /api/v1/csrf-token ab '
+            'und sende den Wert im Header X-CSRF-Token mit der Anfrage.'
+        )
+        return api_error(message, 403)
     message = 'Die Sitzung ist abgelaufen oder ungültig. Bitte erneut versuchen.'
     if 'user_name' in session:
         return redirect(url_for('index', message=message))
@@ -114,8 +165,7 @@ def login_post():
     """Prüft die Zugangsdaten und startet eine Sitzung."""
     user_name = request.form.get('user_name', '').strip()
     password = request.form.get('password', '')
-    password_hash = USERS.get(user_name)
-    if password_hash and check_password_hash(password_hash, password):
+    if authenticate_user(user_name, password):
         session.clear()
         session.permanent = True
         session['user_name'] = user_name
@@ -207,16 +257,16 @@ def api_expenses():
     month_value = request.args.get('month', '')
     today = date.today()
     try:
-        selected_month = (
-            date.fromisoformat(f'{month_value}-01') if month_value
-            else today.replace(day=1)
+        year, month = (
+            parse_month(month_value) if month_value.strip() else (today.year, today.month)
         )
-    except ValueError:
-        return jsonify(error="Invalid month; expected YYYY-MM"), 400
-    expenses = get_month(current_user(), selected_month.year, selected_month.month)
+    except ValueError as error:
+        return api_error(str(error), 400)
+    user_name = current_user()
+    expenses = get_month(user_name, year, month)
     month_total = sum_month(expenses)
     return jsonify(
-        user=current_user(), month=selected_month.strftime('%Y-%m'),
+        user=user_name, month=f'{year:04d}-{month:02d}',
         total=float(month_total.to_decimal()), total_cents=month_total.cents,
         expenses=[expense_to_api(row) for row in expenses],
     )
@@ -228,6 +278,122 @@ def api_latest_expenses():
     """Liefert die letzten 25 Einträge des authentifizierten Nutzers."""
     rows = [expense_to_api(row) for row in get_latest(limit=25, user_name=current_user())]
     return jsonify(user=current_user(), expenses=rows)
+
+
+# --- JSON-API für eigene GUIs unter /api/v1 ---------------------------------
+# Anmeldung wie im Browser über Sitzungs-Cookie (USERS). Schreibende Anfragen
+# brauchen zusätzlich das CSRF-Token der Sitzung als Header X-CSRF-Token;
+# Beträge gehen und kommen als ganzzahlige Cent.
+
+@app.get('/api/v1/csrf-token')
+def api_v1_csrf_token():
+    """Liefert das CSRF-Token der aktuellen Sitzung und legt sie bei Bedarf an."""
+    return jsonify(csrf_token=get_csrf_token())
+
+
+@app.post('/api/v1/login')
+def api_v1_login():
+    """Prüft JSON-Zugangsdaten, startet eine Sitzung und liefert ein frisches CSRF-Token."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return api_error('Der Anfrageinhalt muss ein JSON-Objekt sein.', 400)
+    user_name = str(payload.get('user_name', '')).strip()
+    password = str(payload.get('password', ''))
+    if authenticate_user(user_name, password):
+        session.clear()
+        session.permanent = True
+        session['user_name'] = user_name
+        return jsonify(user=user_name, csrf_token=get_csrf_token())
+    return api_error('Benutzername oder Passwort ist nicht korrekt.', 401)
+
+
+@app.post('/api/v1/logout')
+def api_v1_logout():
+    """Beendet die aktuelle Sitzung."""
+    session.clear()
+    return jsonify(message='Abgemeldet.')
+
+
+@app.get('/api/v1/me')
+@json_login_required
+def api_v1_me():
+    """Liefert den aktuell angemeldeten Nutzer."""
+    return jsonify(user=current_user())
+
+
+@app.get('/api/v1/months')
+@json_login_required
+def api_v1_months():
+    """Listet die Monate mit Einträgen des Nutzers, neueste zuerst (YYYY-MM)."""
+    user_name = current_user()
+    return jsonify(user=user_name, months=get_months_with_entries(user_name))
+
+
+@app.get('/api/v1/expenses')
+@json_login_required
+def api_v1_expenses():
+    """Liefert Ausgaben und Summe in Cent eines Monats; Standard ist der aktuelle Monat."""
+    month_value = request.args.get('month', '')
+    today = date.today()
+    try:
+        year, month = (
+            parse_month(month_value) if month_value.strip() else (today.year, today.month)
+        )
+    except ValueError as error:
+        return api_error(str(error), 400)
+    user_name = current_user()
+    expenses = get_month(user_name, year, month)
+    rows = [
+        {
+            'id': row['id'],
+            'expense_date': row['expense_date'],
+            'amount_cents': row['amount_cents'],
+            'description': row['description'],
+            'category': row['category'],
+        }
+        for row in expenses
+    ]
+    return jsonify(
+        user=user_name,
+        month=f'{year:04d}-{month:02d}',
+        total_cents=sum_month(expenses).cents,
+        expenses=rows,
+    )
+
+
+@app.post('/api/v1/expenses')
+@json_login_required
+def api_v1_add_expense():
+    """Erfasst eine Ausgabe als JSON; Betrag als ganze Cent, optional mit Datum."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return api_error('Der Anfrageinhalt muss ein JSON-Objekt sein.', 400)
+    amount_cents = payload.get('amount_cents')
+    raw_description = payload.get('description')
+    expense_date_value = payload.get('expense_date')
+    if isinstance(amount_cents, bool) or not isinstance(amount_cents, int):
+        return api_error('amount_cents muss eine ganze Zahl in Cent sein.', 400)
+    if raw_description is None or not str(raw_description).strip():
+        return api_error('Eine Beschreibung ist erforderlich.', 400)
+    expense_date = None
+    if expense_date_value is not None:
+        date_text = str(expense_date_value)
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', date_text):
+            return api_error('expense_date muss das Format YYYY-MM-DD haben.', 400)
+        try:
+            expense_date = date.fromisoformat(date_text).isoformat()
+        except ValueError:
+            return api_error('expense_date ist kein gültiges Datum.', 400)
+    user_name = current_user()
+    try:
+        new_id = insert_expense(
+            user_name, amount_cents, str(raw_description), expense_date=expense_date
+        )
+    except ValueError as error:
+        return api_error(str(error), 400)
+    response = jsonify(id=new_id, user=user_name)
+    response.status_code = 201
+    return response
 
 
 @app.get('/favicon.ico')

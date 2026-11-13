@@ -62,9 +62,22 @@ def parse_input(raw_input):
     return amount, description, find_category(description)
 
 
-def add_expense(user_name, raw_input, expense_date=None):
-    """Speichert einen Eintrag samt Nutzername und erkannter Kategorie."""
-    amount, description, category = parse_input(raw_input)
+def insert_expense(user_name, amount_cents, description, expense_date=None):
+    """Gemeinsame Schreibfunktion für Oberfläche und API.
+
+    Validiert den Cent-Betrag und die Beschreibung, erkennt die Kategorie
+    anhand der Beschreibung und speichert den Eintrag; liefert die neue ID.
+    """
+    if isinstance(amount_cents, bool) or not isinstance(amount_cents, int):
+        raise ValueError('Der Betrag muss eine ganze Zahl in Cent sein.')
+    if amount_cents <= 0 or amount_cents > MAX_CENTS:
+        raise ValueError(
+            'Der Betrag muss größer als null sein und innerhalb des zulässigen Höchstbetrags liegen.'
+        )
+    cleaned_description = str(description).strip()
+    if not cleaned_description:
+        raise ValueError('Füge eine Beschreibung hinzu.')
+    category = find_category(cleaned_description)
     with get_connection() as connection:
         cursor = connection.execute(
             'INSERT INTO expenses '
@@ -72,10 +85,16 @@ def add_expense(user_name, raw_input, expense_date=None):
             'VALUES (?, ?, ?, ?, ?)',
             (
                 expense_date or date.today().isoformat(), user_name,
-                amount.cents, description, category,
+                amount_cents, cleaned_description, category,
             ),
         )
         return cursor.lastrowid
+
+
+def add_expense(user_name, raw_input, expense_date=None):
+    """Speichert einen Eintrag samt Nutzername und erkannter Kategorie."""
+    amount, description, _ = parse_input(raw_input)
+    return insert_expense(user_name, amount.cents, description, expense_date=expense_date)
 
 
 def get_latest(limit=25, user_name=None):
@@ -127,6 +146,17 @@ def get_month(user_name, year=None, month=None):
             'ORDER BY expense_date DESC, id DESC',
             (user_name, month_start, month_end),
         ).fetchall()
+
+
+def get_months_with_entries(user_name):
+    """Liefert die Monate (YYYY-MM) mit Einträgen des Nutzers, neueste zuerst."""
+    with get_connection() as connection:
+        rows = connection.execute(
+            'SELECT DISTINCT substr(expense_date, 1, 7) AS month '
+            'FROM expenses WHERE user_name = ? ORDER BY month DESC',
+            (user_name,),
+        ).fetchall()
+        return [row['month'] for row in rows]
 
 
 def sum_month(rows):
