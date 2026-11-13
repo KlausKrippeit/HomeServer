@@ -117,3 +117,111 @@ curl -H "Authorization: Bearer $API_TOKEN" http://127.0.0.1:8080/api/expenses/la
 ```
 
 Die erste Route liefert `{user, month, total, expenses}`; die letzte `{user, expenses}`. Beide scopen Daten ausschließlich auf den Nutzer des Tokens. Die API bietet bewusst nur GET-Lesezugriff, keine Token-Ausgabe, Token-Rotation oder Schreiboperationen. Browser-Formulare verwenden weiterhin Sitzungs-Cookies und CSRF-Schutz.
+
+## JSON-API für eigene GUIs (/api/v1)
+
+Die Endpunkte unter `/api/v1` sind für selbst gebaute GUIs gedacht, die dieselbe Origin wie der Server verwenden (GUI und API hinter derselben Adresse). Sie nutzen exakt dieselbe Anmeldung (`USERS`), dieselbe Datenbank und dieselbe Betragsverarbeitung wie die Weboberfläche. Beträge kommen und gehen als **ganzzahlige Cent**; Fehler antworten mit JSON und passendem HTTP-Statuscode.
+
+### Anmeldung und CSRF-Schutz
+
+Die GUI meldet sich über `POST /api/v1/login` an; das Session-Cookie (`HttpOnly`, `SameSite=Lax`) bleibt für alle weiteren Anfragen bestehen. Wie die HTML-Oberfläche sind **alle schreibenden API-Anfragen (Anmelden, Abmelden, Ausgabe erfassen) CSRF-geschützt**:
+
+1. Vor der ersten Anfrage `GET /api/v1/csrf-token` aufrufen — das legt die Sitzung an und liefert den Token als JSON.
+2. Den Token bei jeder schreibenden Anfrage im Header `X-CSRF-Token` mitsenden. Das Session-Cookie wird automatisch mitgesendet, weil GUI und API dieselbe Origin haben; ein Cross-Site-Angriff kann den Header nicht setzen.
+3. Nach einer erfolgreichen Anmeldung rotiert der Server die Sitzung (Schutz vor Session-Fixierung) und liefert in der Antwort ein **frisches** `csrf_token`. Dieses gilt ab sofort für alle weiteren schreibenden Anfragen — das alte Token ist danach ungültig.
+
+Eine schreibende Anfrage ohne gültiges Token erhält HTTP `403` mit JSON-Fehler; Lese-Endpunkte ohne Anmeldung antworten mit HTTP `401`; ungültige Beträge, Beschreibungen oder Monatswerte liefern HTTP `400` als JSON.
+
+### Endpunkte
+
+| Methode und Pfad | Zweck |
+| --- | --- |
+| `GET /api/v1/csrf-token` | CSRF-Token der Sitzung holen (legt die Sitzung an). Antwort: `{csrf_token}`. |
+| `POST /api/v1/login` | Anmelden mit `{user_name, password}`. Antwort: `{user, csrf_token}`. Falsche Zugangsdaten: `401`. |
+| `POST /api/v1/logout` | Sitzung beenden. Antwort: `{message}`. |
+| `GET /api/v1/me` | Aktuell angemeldeten Nutzer abfragen. Antwort: `{user}`. Ohne Anmeldung: `401`. |
+| `GET /api/v1/months` | Monate des Nutzers mit Einträgen, neueste zuerst (`YYYY-MM`). Antwort: `{user, months}`. |
+| `GET /api/v1/expenses?month=YYYY-MM` | Ausgaben und Summe eines Monats; ohne `month` der aktuelle Monat. Antwort: `{user, month, total_cents, expenses}`. Ungültiger Monat: `400`. |
+| `POST /api/v1/expenses` | Ausgabe erfassen mit `{amount_cents, description}` plus optional `expense_date` (`YYYY-MM-DD`). Erfolg: `201` mit `{id, user}`. Ungültige Werte: `400`. |
+
+Die Kategorie wird wie im Formular anhand der Beschreibung erkannt; unbekannte Stichwörter landen in `Other` (in der Oberfläche „Sonstiges“). Die bisherigen Bearer-Token-Endpunkte `/api/expenses` und `/api/expenses/latest` bleiben unverändert erhalten.
+
+### JSON-Antworten
+
+`GET /api/v1/expenses?month=2026-11`:
+
+```json
+{
+  "user": "Anna",
+  "month": "2026-11",
+  "total_cents": 1050,
+  "expenses": [
+    {
+      "id": 2,
+      "expense_date": "2026-11-13",
+      "amount_cents": 560,
+      "description": "Kaffee",
+      "category": "Essen gehen"
+    },
+    {
+      "id": 1,
+      "expense_date": "2026-11-13",
+      "amount_cents": 490,
+      "description": "Rewe",
+      "category": "Lebensmittel"
+    }
+  ]
+}
+```
+
+`POST /api/v1/login` (erfolg) bzw. `GET /api/v1/me`, `GET /api/v1/months`, `POST /api/v1/expenses` (erfolg, HTTP `201`) und ein typischer Fehler:
+
+```json
+{ "user": "Anna", "csrf_token": "<frisches-token-nach-login>" }
+```
+
+```json
+{ "user": "Anna" }
+```
+
+```json
+{ "user": "Anna", "months": ["2026-11"] }
+```
+
+```json
+{ "id": 3, "user": "Anna" }
+```
+
+```json
+{ "error": "Invalid month; expected YYYY-MM" }
+```
+
+### curl-Ablauf: Anmeldung → Ausgabe erfassen → Monatsübersicht
+
+Kopier- und ausführungsfähig (Pfad `BASE` und Zugangsdaten anpassen):
+
+```sh
+BASE=http://127.0.0.1:8080
+JAR=cookies.txt; rm -f "$JAR"
+JSON='import json,sys; print(json.load(sys.stdin)["csrf_token"])'
+
+# 1) CSRF-Token holen (legt die Sitzungs-Cookie an)
+CSRF=$(curl -s -b "$JAR" -c "$JAR" "$BASE/api/v1/csrf-token" | python3 -c "$JSON")
+
+# 2) Anmelden — die Antwort enthält ein frisches csrf_token, das danach verwendet wird
+CSRF=$(curl -s -b "$JAR" -c "$JAR" -X POST "$BASE/api/v1/login" \
+  -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
+  -d '{"user_name":"Anna","password":"<passwort>"}' | python3 -c "$JSON")
+
+# 3) Ausgabe erfassen (Betrag in Cent)
+curl -s -b "$JAR" -X POST "$BASE/api/v1/expenses" \
+  -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
+  -d '{"amount_cents":490,"description":"Rewe"}'; echo
+
+# 4) Verfügbare Monate und Monatsübersicht (Summe in Cent)
+curl -s -b "$JAR" "$BASE/api/v1/months"; echo
+curl -s -b "$JAR" "$BASE/api/v1/expenses?month=2026-11"; echo
+
+# 5) Abmelden
+curl -s -b "$JAR" -X POST "$BASE/api/v1/logout" -H "X-CSRF-Token: $CSRF"; echo
+```
