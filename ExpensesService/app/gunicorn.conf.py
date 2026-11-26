@@ -8,4 +8,4 @@ timeout = 120
 graceful_timeout = 30
 accesslog = "-"
 errorlog = "-"
-loglevel = os.getenv("LOG_LEVEL", "debug")
+loglevel = os.getenv("LOG_LEVEL", "info")

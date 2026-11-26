@@ -1,38 +1,16 @@
 import re
 import sqlite3
 from datetime import date
-from pathlib import Path
 
-from config import CATEGORY_MAP, DB_PATH, DEFAULT_CATEGORY
+from config import CATEGORY_MAP, DEFAULT_CATEGORY
+from database import COLUMNS, get_connection
 from money import MAX_CENTS, Money
+from werkzeug.security import check_password_hash, generate_password_hash
 
 AMOUNT_PATTERN = re.compile(
     r'(?i)(?:(?:euro|eur\b|€)\s*)?(\d+(?:[.,]\d{1,2})?)'
     r'(?:\s*(?:euro|eur\b|€))?'
 )
-
-SCHEMA = (
-    'CREATE TABLE IF NOT EXISTS expenses ('
-    'id INTEGER PRIMARY KEY AUTOINCREMENT, '
-    "expense_date TEXT NOT NULL CHECK (expense_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'), "
-    'user_name TEXT NOT NULL, '
-    'amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0), '
-    'description TEXT NOT NULL, category TEXT NOT NULL)'
-)
-
-COLUMNS = 'id, expense_date, user_name, amount_cents, description, category'
-
-
-def get_connection():
-    """Stellt eine Verbindung her und legt die benötigte Tabelle an."""
-    database_path = Path(DB_PATH)
-    print(f'get_connection: database_path: {database_path}')
-    if str(database_path.parent) not in ('', '.'):
-        database_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(str(database_path))
-    connection.row_factory = sqlite3.Row
-    connection.execute(SCHEMA)
-    return connection
 
 
 def find_category(description):
@@ -134,3 +112,59 @@ def sum_month(rows):
     """Einzige Stelle der Summenbildung über Datenbankzeilen."""
     from money import total
     return total(Money(row['amount_cents']) for row in rows)
+
+
+MAX_PASSWORD_LENGTH = 128
+
+
+def validate_password_length(password):
+    """Prüft, ob das Passwort die maximale Länge von 128 Zeichen einhält."""
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise ValueError(
+            f'Das Passwort darf maximal {MAX_PASSWORD_LENGTH} Zeichen lang sein '
+            f'(aktuell: {len(password)} Zeichen).'
+        )
+
+
+def get_user_by_email(email):
+    """Liefert einen Benutzer nach E-Mail oder None."""
+    with get_connection() as connection:
+        return connection.execute(
+            'SELECT id, email, password_hash, created_at FROM users WHERE email = ?',
+            (email,),
+        ).fetchone()
+
+
+def create_user(email, password):
+    """Erstellt einen neuen Benutzer mit gehashtem Passwort in der Datenbank."""
+    validate_password_length(password)
+    password_hash = generate_password_hash(password)
+    with get_connection() as connection:
+        try:
+            cursor = connection.execute(
+                'INSERT INTO users (email, password_hash) VALUES (?, ?)',
+                (email, password_hash),
+            )
+            return cursor.lastrowid
+        except sqlite3.IntegrityError:
+            raise ValueError(f'Ein Benutzer mit der E-Mail {email} existiert bereits.')
+
+
+def update_password(email, new_password):
+    """Aktualisiert das Passwort eines bestehenden Benutzers."""
+    validate_password_length(new_password)
+    password_hash = generate_password_hash(new_password)
+    with get_connection() as connection:
+        cursor = connection.execute(
+            'UPDATE users SET password_hash = ? WHERE email = ?',
+            (password_hash, email),
+        )
+        return cursor.rowcount > 0
+
+
+def verify_password(email, password):
+    """Prüft, ob das übergebene Passwort zum gespeicherten Hash passt."""
+    user = get_user_by_email(email)
+    if user is None:
+        return False
+    return check_password_hash(user['password_hash'], password)

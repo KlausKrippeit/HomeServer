@@ -1,7 +1,7 @@
 from datetime import date
 
 from config import MAIL_FROM, MAIL_TO, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER
-from db import get_month, sum_month
+from models import get_month, sum_month
 from money import Money
 
 

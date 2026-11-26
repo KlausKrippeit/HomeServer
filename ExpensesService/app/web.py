@@ -7,7 +7,7 @@ from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from config import API_TOKENS, SECRET_KEY, USERS
-from db import add_expense, delete_latest, get_latest, get_month, sum_month
+from models import add_expense, delete_latest, get_latest, get_month, sum_month, verify_password
 from money import Money
 from report import build_report
 
@@ -113,8 +113,8 @@ def login_post():
     """Prüft die Zugangsdaten und startet eine Sitzung."""
     user_name = request.form.get('user_name', '').strip()
     password = request.form.get('password', '')
-    password_hash = USERS.get(user_name)
-    if password_hash and check_password_hash(password_hash, password):
+    verified = verify_password(user_name, password)
+    if verified:
         session.clear()
         session.permanent = True
         session['user_name'] = user_name
