@@ -24,3 +24,8 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+
+# DB
+*.db
+
+.github

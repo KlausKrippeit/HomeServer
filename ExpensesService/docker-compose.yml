@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  expenses:
+    build: .
+    container_name: expenses-service
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/expenses.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  expenses_data:

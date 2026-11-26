@@ -1,0 +1,243 @@
+import secrets
+from datetime import date, timedelta
+from flask import jsonify, g, make_response
+from functools import wraps
+
+from flask import Flask, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash
+
+from config import API_TOKENS, SECRET_KEY, USERS
+from db import add_expense, delete_latest, get_latest, get_month, sum_month
+from money import Money
+from report import build_report
+
+app = Flask(__name__)
+if not SECRET_KEY:
+    raise RuntimeError('SECRET_KEY muss als Umgebungsvariable oder in .env gesetzt sein.')
+app.secret_key = SECRET_KEY
+app.permanent_session_lifetime = timedelta(days=30)
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax')
+
+
+def get_csrf_token():
+    """Liefert das CSRF-Token der Sitzung und erzeugt es bei Bedarf."""
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_urlsafe(32)
+    return session['_csrf_token']
+
+
+app.jinja_env.globals['csrf_token'] = get_csrf_token
+
+
+def expense_to_api(row):
+    """Serialisiert eine Zeile: amount als Dezimalzahl (kompatibel) plus amount_cents."""
+    return {
+        'id': row['id'], 'expense_date': row['expense_date'],
+        'user_name': row['user_name'],
+        'amount': float(Money(row['amount_cents']).to_decimal()),
+        'amount_cents': row['amount_cents'],
+        'description': row['description'], 'category': row['category'],
+    }
+
+
+def expense_to_view(row):
+    """Bereitet eine Zeile für das Template mit formatiertem Betrag auf."""
+    view = dict(row)
+    view['amount'] = str(Money(row['amount_cents']))
+    return view
+
+
+@app.before_request
+def authenticate_bearer_token():
+    """Setzt den Nutzer aus einem gültigen Authorization: Bearer-Header."""
+    g.auth_user = None
+    authorization = request.headers.get('Authorization', '')
+    if not authorization.startswith('Bearer '):
+        return None
+    supplied = authorization[7:].strip()
+    matched_user = None
+    for configured_token, user_name in API_TOKENS.items():
+        if secrets.compare_digest(supplied.encode('utf-8'), configured_token.encode('utf-8')):
+            matched_user = user_name
+    if matched_user is None:
+        return jsonify(error='Invalid bearer token'), 401
+    g.auth_user = matched_user
+
+
+def current_user():
+    """Liefert den Nutzer aus Bearer-Token oder Browser-Sitzung."""
+    return getattr(g, 'auth_user', None) or session.get('user_name')
+
+
+@app.before_request
+def protect_against_csrf():
+    """Lehnt schreibende Anfragen ohne gültiges CSRF-Token ab."""
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        return None
+    expected_token = session.get('_csrf_token', '')
+    submitted_token = (
+        request.form.get('csrf_token', '')
+        or request.headers.get('X-CSRF-Token', '')
+    )
+    if expected_token and secrets.compare_digest(
+        expected_token.encode('utf-8'), submitted_token.encode('utf-8')
+    ):
+        return None
+    app.logger.warning('CSRF-Prüfung fehlgeschlagen für %s', request.path)
+    message = 'Die Sitzung ist abgelaufen oder ungültig. Bitte erneut versuchen.'
+    if 'user_name' in session:
+        return redirect(url_for('index', message=message))
+    return redirect(url_for('login', message=message))
+
+
+def login_required(view_function):
+    """Schützt eine Ansicht vor Zugriffen ohne Anmeldung."""
+    @wraps(view_function)
+    def wrapped_view(*args, **kwargs):
+        if request.path.startswith('/api/') and not getattr(g, 'auth_user', None):
+            return jsonify(error='Bearer token required'), 401
+        if not current_user():
+            return redirect(url_for('login'))
+        return view_function(*args, **kwargs)
+    return wrapped_view
+
+
+@app.get('/login')
+def login():
+    """Zeigt das Anmeldeformular an."""
+    return render_template('login.html', message=request.args.get('message', ''))
+
+
+@app.post('/login')
+def login_post():
+    """Prüft die Zugangsdaten und startet eine Sitzung."""
+    user_name = request.form.get('user_name', '').strip()
+    password = request.form.get('password', '')
+    password_hash = USERS.get(user_name)
+    if password_hash and check_password_hash(password_hash, password):
+        session.clear()
+        session.permanent = True
+        session['user_name'] = user_name
+        return redirect(url_for('index'))
+    return redirect(
+        url_for('login', message='Benutzername oder Passwort ist nicht korrekt.')
+    )
+
+
+@app.get('/logout')
+def logout():
+    """Beendet die aktuelle Sitzung."""
+    session.clear()
+    return redirect(url_for('login', message='Du hast dich abgemeldet.'))
+
+
+@app.get('/')
+@login_required
+def index():
+    """Zeigt Einträge für den gewählten Monat und dessen Summe."""
+    month_value = request.args.get('month', '')
+    today = date.today()
+    try:
+        selected_month = (
+            date.fromisoformat(f'{month_value}-01')
+            if month_value else today.replace(day=1)
+        )
+    except ValueError:
+        selected_month = today.replace(day=1)
+    expenses = get_month(current_user(), selected_month.year, selected_month.month)
+    return render_template(
+        'index.html', expenses=[expense_to_view(row) for row in expenses],
+        selected_month=selected_month.strftime('%Y-%m'),
+        total=sum_month(expenses),
+        message=request.args.get('message', ''),
+    )
+
+
+@app.post('/add')
+@login_required
+def add_expense_view():
+    """Speichert eine eingegebene Ausgabe."""
+    try:
+        add_expense(current_user(), request.form.get('expense', ''))
+    except ValueError as error:
+        return redirect(url_for('index', message=str(error)))
+    return redirect(url_for('index', message='Ausgabe gespeichert.'))
+
+
+@app.post('/delete-latest')
+@login_required
+def delete_latest_view():
+    """Entfernt den jüngsten Eintrag des angemeldeten Nutzers."""
+    removed = delete_latest(current_user())
+    message = (
+        'Letzter Eintrag gelöscht.' if removed
+        else 'Es gibt keine Einträge zum Löschen.'
+    )
+    return redirect(url_for('index', message=message))
+
+
+@app.post('/download-report')
+@login_required
+def download_report():
+    """Liefert den Monatsbericht als Textdatei zum Herunterladen."""
+    month_value = request.form.get('month', '')
+    today = date.today()
+    try:
+        selected_month = (
+            date.fromisoformat(f'{month_value}-01')
+            if month_value else today
+        )
+        report_text = build_report(current_user(), selected_month.year, selected_month.month)
+        filename = f'ausgabenbericht_{selected_month.year}_{selected_month.month:02d}.txt'
+        response = make_response(report_text)
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+        return response
+    except Exception:
+        app.logger.exception('Der Bericht konnte nicht erstellt werden')
+        message = 'Der Bericht konnte nicht erstellt werden.'
+        return redirect(url_for('index', month=month_value, message=message))
+
+
+@app.get('/api/expenses')
+@login_required
+def api_expenses():
+    """Liefert authentifizierte Ausgaben des Nutzers, optional nach Monat gefiltert."""
+    month_value = request.args.get('month', '')
+    today = date.today()
+    try:
+        selected_month = (
+            date.fromisoformat(f'{month_value}-01') if month_value
+            else today.replace(day=1)
+        )
+    except ValueError:
+        return jsonify(error="Invalid month; expected YYYY-MM"), 400
+    expenses = get_month(current_user(), selected_month.year, selected_month.month)
+    month_total = sum_month(expenses)
+    return jsonify(
+        user=current_user(), month=selected_month.strftime('%Y-%m'),
+        total=float(month_total.to_decimal()), total_cents=month_total.cents,
+        expenses=[expense_to_api(row) for row in expenses],
+    )
+
+
+@app.get('/api/expenses/latest')
+@login_required
+def api_latest_expenses():
+    """Liefert die letzten 25 Einträge des authentifizierten Nutzers."""
+    rows = [expense_to_api(row) for row in get_latest(limit=25, user_name=current_user())]
+    return jsonify(user=current_user(), expenses=rows)
+
+
+@app.get('/favicon.ico')
+def favicon():
+    """Liefert das Favicon für direkte Browser-Anfragen."""
+    return app.send_static_file('favicon.ico')
+
+
+@app.get('/sw.js')
+def service_worker():
+    """Liefert den Service Worker mit Gültigkeit für den Stamm-Pfad."""
+    return app.send_static_file('sw.js'), 200, {
+        'Content-Type': 'application/javascript', 'Service-Worker-Allowed': '/',
+    }
